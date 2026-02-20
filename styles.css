@@ -78,7 +78,24 @@ strong {
   font-size: 1.2rem;
 }
 
+.miner-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.miner-stat-row span {
+  opacity: 0.8;
+}
+
+.miner-stat-row strong {
+  font-size: 0.9rem;
+}
+
 .upgrades {
+  grid-column: 2;
   display: grid;
   gap: 0.75rem;
 }
@@ -149,27 +166,20 @@ strong {
   align-items: start;
 }
 
+.panel.map {
+  grid-column: 1;
+  position: relative;
+  overflow: visible;
+}
+
 .map {
   display: grid;
   gap: 0.75rem;
-  justify-items: stretch;
+  justify-items: center;
 }
 
 .map-meta {
   opacity: 0.85;
-}
-
-.map-body {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.map-main {
-  display: grid;
-  gap: 0.75rem;
-  justify-items: center;
-  flex: 1;
 }
 
 .map-environment {
@@ -195,32 +205,16 @@ strong {
 }
 
 .miner-stats-panel {
-  width: 240px;
+  position: absolute;
+  right: calc(100% + 1rem);
+  top: 0;
+  width: 220px;
   display: grid;
   gap: 0.45rem;
-  padding: 0.8rem;
-  border: 1px solid rgb(156 181 235 / 20%);
-  border-radius: 10px;
-  background: rgb(23 33 53 / 70%);
 }
 
 .miner-stats-panel.hidden {
   display: none !important;
-}
-
-.miner-stat-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.miner-stat-row span {
-  opacity: 0.8;
-}
-
-.miner-stat-row strong {
-  font-size: 0.9rem;
 }
 
 .miner-popup-header {
@@ -375,11 +369,31 @@ button:disabled {
 
 .upgrade {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.2rem;
+}
+
+.upgrade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.upgrade-quantity {
+  font-size: 1rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .upgrade small {
+  opacity: 0.75;
+  font-size: 0.8rem;
+}
+
+.upgrade-cost-row {
+  font-size: 0.8rem;
   opacity: 0.85;
+  margin-top: 0.05rem;
 }
 
 .status {
@@ -392,12 +406,18 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .map-body {
-    flex-direction: column;
+  .panel.map {
+    grid-column: 1;
+  }
+
+  .upgrades {
+    grid-column: 1;
   }
 
   .miner-stats-panel {
+    position: static;
     width: 100%;
+    margin-bottom: 0.75rem;
   }
 
   .topbar {

@@ -9,6 +9,8 @@ const MIN_TILE_COVERAGE_IN_RADIUS = 0.3;
 interface MinerUpgrade {
   speedLevel: number;
   radiusLevel: number;
+  doubleActivationMinLevel: number;
+  doubleActivationMaxLevel: number;
 }
 
 interface Position {
@@ -36,8 +38,6 @@ interface GameState {
   idleMinerOwned: number;
   mapExpansions: number;
   coalGenerationLevel: number;
-  doubleActivationMinLevel: number;
-  doubleActivationMaxLevel: number;
   lastTick: number;
   lastRenderedMapSize: number;
   idleMinerCooldowns: number[];
@@ -114,8 +114,6 @@ const state: GameState = {
   idleMinerOwned: 0,
   mapExpansions: 0,
   coalGenerationLevel: 0,
-  doubleActivationMinLevel: 0,
-  doubleActivationMaxLevel: 0,
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
   idleMinerCooldowns: [],
@@ -251,11 +249,13 @@ function getIdleMinerCost(): number {
 function getMinerUpgrade(minerIndex: number): MinerUpgrade {
   const upgrade = state.idleMinerUpgrades[minerIndex];
   if (!upgrade) {
-    return { speedLevel: 0, radiusLevel: 0 };
+    return { speedLevel: 0, radiusLevel: 0, doubleActivationMinLevel: 0, doubleActivationMaxLevel: 0 };
   }
   return {
     speedLevel: Number(upgrade.speedLevel) || 0,
     radiusLevel: Number(upgrade.radiusLevel) || 0,
+    doubleActivationMinLevel: Number(upgrade.doubleActivationMinLevel) || 0,
+    doubleActivationMaxLevel: Number(upgrade.doubleActivationMaxLevel) || 0,
   };
 }
 
@@ -299,25 +299,25 @@ function getCoalSpawnChance(): number {
   return 0.05 * (1 + state.coalGenerationLevel * 0.5);
 }
 
-function getDoubleActivationMinCost(): number {
-  return getUpgradeCost(doubleActivationMinUpgrade, state.doubleActivationMinLevel);
+function getDoubleActivationMinCost(minerIndex: number): number {
+  return getUpgradeCost(doubleActivationMinUpgrade, getMinerUpgrade(minerIndex).doubleActivationMinLevel);
 }
 
-function getDoubleActivationMaxCost(): number {
-  return getUpgradeCost(doubleActivationMaxUpgrade, state.doubleActivationMaxLevel);
+function getDoubleActivationMaxCost(minerIndex: number): number {
+  return getUpgradeCost(doubleActivationMaxUpgrade, getMinerUpgrade(minerIndex).doubleActivationMaxLevel);
 }
 
-function getDoubleActivationMinPercent(): number {
-  return state.doubleActivationMinLevel * 0.05;
+function getDoubleActivationMinPercent(minerIndex: number): number {
+  return getMinerUpgrade(minerIndex).doubleActivationMinLevel * 0.05;
 }
 
-function getDoubleActivationMaxPercent(): number {
-  return state.doubleActivationMaxLevel * 0.1;
+function getDoubleActivationMaxPercent(minerIndex: number): number {
+  return getMinerUpgrade(minerIndex).doubleActivationMaxLevel * 0.1;
 }
 
-function rollDoubleActivation(): number {
-  const minPercent = getDoubleActivationMinPercent();
-  const maxPercent = getDoubleActivationMaxPercent();
+function rollDoubleActivation(minerIndex: number): number {
+  const minPercent = getDoubleActivationMinPercent(minerIndex);
+  const maxPercent = getDoubleActivationMaxPercent(minerIndex);
 
   // If min > max, just use max
   if (minPercent > maxPercent) {
@@ -362,15 +362,17 @@ function getMinerRadiusStatText(minerIndex: number): string {
   return `Current: ${currentMultiplier}x area → Upgrading to: ${nextMultiplier}x area`;
 }
 
-function getDoubleActivationMinStatText(): string {
-  const current = (state.doubleActivationMinLevel * 0.05 * 100).toFixed(0);
-  const next = ((state.doubleActivationMinLevel + 1) * 0.05 * 100).toFixed(0);
+function getDoubleActivationMinStatText(minerIndex: number): string {
+  const level = getMinerUpgrade(minerIndex).doubleActivationMinLevel;
+  const current = (level * 0.05 * 100).toFixed(0);
+  const next = ((level + 1) * 0.05 * 100).toFixed(0);
   return `Current min: ${current}% → Upgrading to: ${next}%`;
 }
 
-function getDoubleActivationMaxStatText(): string {
-  const current = (state.doubleActivationMaxLevel * 0.1 * 100).toFixed(0);
-  const next = ((state.doubleActivationMaxLevel + 1) * 0.1 * 100).toFixed(0);
+function getDoubleActivationMaxStatText(minerIndex: number): string {
+  const level = getMinerUpgrade(minerIndex).doubleActivationMaxLevel;
+  const current = (level * 0.1 * 100).toFixed(0);
+  const next = ((level + 1) * 0.1 * 100).toFixed(0);
   return `Current max: ${current}% → Upgrading to: ${next}%`;
 }
 
@@ -414,8 +416,6 @@ function saveGame(showStatus: boolean = true): void {
       idleMinerUpgrades: state.idleMinerUpgrades,
       mapExpansions: state.mapExpansions,
       coalGenerationLevel: state.coalGenerationLevel,
-      doubleActivationMinLevel: state.doubleActivationMinLevel,
-      doubleActivationMaxLevel: state.doubleActivationMaxLevel,
       savedAt: Date.now(),
     })
   );
@@ -442,7 +442,7 @@ function syncIdleMinerState(): void {
   }
 
   while (state.idleMinerUpgrades.length < state.idleMinerOwned) {
-    state.idleMinerUpgrades.push({ speedLevel: 0, radiusLevel: 0 });
+    state.idleMinerUpgrades.push({ speedLevel: 0, radiusLevel: 0, doubleActivationMinLevel: 0, doubleActivationMaxLevel: 0 });
   }
   if (state.idleMinerUpgrades.length > state.idleMinerOwned) {
     state.idleMinerUpgrades.length = state.idleMinerOwned;
@@ -494,6 +494,8 @@ function loadGame(): void {
             return {
               speedLevel: Number(u?.speedLevel) || 0,
               radiusLevel: Number(u?.radiusLevel) || 0,
+              doubleActivationMinLevel: Number(u?.doubleActivationMinLevel) || 0,
+              doubleActivationMaxLevel: Number(u?.doubleActivationMaxLevel) || 0,
             };
           })
           .filter((upgrade) => upgrade.speedLevel >= 0 && upgrade.radiusLevel >= 0)
@@ -507,8 +509,6 @@ function loadGame(): void {
 
     state.mapExpansions = Number(parsed.mapExpansions) || 0;
     state.coalGenerationLevel = Number(parsed.coalGenerationLevel) || 0;
-    state.doubleActivationMinLevel = Number(parsed.doubleActivationMinLevel) || 0;
-    state.doubleActivationMaxLevel = Number(parsed.doubleActivationMaxLevel) || 0;
     syncIdleMinerState();
 
     const now = Date.now();
@@ -745,8 +745,6 @@ function resetGame(): void {
   state.idleMinerOwned = 0;
   state.mapExpansions = 0;
   state.coalGenerationLevel = 0;
-  state.doubleActivationMinLevel = 0;
-  state.doubleActivationMaxLevel = 0;
   state.lastTick = Date.now();
   state.lastRenderedMapSize = 0;
   state.idleMinerCooldowns = [];
@@ -779,22 +777,26 @@ function buyCoalGeneration(): void {
 }
 
 function buyDoubleActivationMin(): void {
-  const cost = getDoubleActivationMinCost();
+  const minerIndex = interactionState.selectedMinerIndex;
+  if (minerIndex === null) return;
+  const cost = getDoubleActivationMinCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.doubleActivationMinLevel += 1;
+  state.idleMinerUpgrades[minerIndex].doubleActivationMinLevel += 1;
   render();
 }
 
 function buyDoubleActivationMax(): void {
-  const cost = getDoubleActivationMaxCost();
+  const minerIndex = interactionState.selectedMinerIndex;
+  if (minerIndex === null) return;
+  const cost = getDoubleActivationMaxCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.doubleActivationMaxLevel += 1;
+  state.idleMinerUpgrades[minerIndex].doubleActivationMaxLevel += 1;
   render();
 }
 
@@ -887,23 +889,23 @@ function renderMinerPopup(): void {
   const upgrade = getMinerUpgrade(minerIndex);
   const speedCost = getMinerSpeedUpgradeCost(minerIndex);
   const radiusCost = getMinerRadiusUpgradeCost(minerIndex);
-  const doubleActivationMinCost = getDoubleActivationMinCost();
-  const doubleActivationMaxCost = getDoubleActivationMaxCost();
+  const doubleActivationMinCost = getDoubleActivationMinCost(minerIndex);
+  const doubleActivationMaxCost = getDoubleActivationMaxCost(minerIndex);
 
   ui.minerPopup.classList.remove("hidden");
   if (ui.minerPopupTitle) ui.minerPopupTitle.textContent = `Miner ${minerIndex + 1}`;
   if (ui.popupSpeedLevel) ui.popupSpeedLevel.textContent = upgrade.speedLevel.toString();
   if (ui.popupRadiusLevel) ui.popupRadiusLevel.textContent = upgrade.radiusLevel.toString();
-  if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = state.doubleActivationMinLevel.toString();
-  if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = state.doubleActivationMaxLevel.toString();
+  if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = upgrade.doubleActivationMinLevel.toString();
+  if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = upgrade.doubleActivationMaxLevel.toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = radiusCost.toLocaleString();
   if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = doubleActivationMinCost.toLocaleString();
   if (ui.popupDoubleActivationMaxCost) ui.popupDoubleActivationMaxCost.textContent = doubleActivationMaxCost.toLocaleString();
-  if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = getMinerSpeedStatText(minerIndex) + " • Cost: " + speedCost.toLocaleString();
-  if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = getMinerRadiusStatText(minerIndex) + " • Cost: " + radiusCost.toLocaleString();
-  if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = getDoubleActivationMinStatText() + " • Cost: " + doubleActivationMinCost.toLocaleString();
-  if (ui.popupDoubleActivationMaxStat) ui.popupDoubleActivationMaxStat.textContent = getDoubleActivationMaxStatText() + " • Cost: " + doubleActivationMaxCost.toLocaleString();
+  if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = getMinerSpeedStatText(minerIndex);
+  if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = getMinerRadiusStatText(minerIndex);
+  if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = getDoubleActivationMinStatText(minerIndex);
+  if (ui.popupDoubleActivationMaxStat) ui.popupDoubleActivationMaxStat.textContent = getDoubleActivationMaxStatText(minerIndex);
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !canAfford(speedCost);
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !canAfford(radiusCost);
   if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !canAfford(doubleActivationMinCost);
@@ -924,8 +926,8 @@ function renderMinerStatsPanel(): void {
   const clicksPerSecond = getMinerClicksPerSecond(minerIndex);
   const cooldownSeconds = getMinerCooldownSeconds(minerIndex);
   const radiusPx = getMinerEffectRadiusPx(minerIndex);
-  const minPercent = Math.round(getDoubleActivationMinPercent() * 100);
-  const maxPercent = Math.round(getDoubleActivationMaxPercent() * 100);
+  const minPercent = Math.round(getDoubleActivationMinPercent(minerIndex) * 100);
+  const maxPercent = Math.round(getDoubleActivationMaxPercent(minerIndex) * 100);
 
   ui.minerStatsPanel.classList.remove("hidden");
   if (ui.minerStatsTitle) ui.minerStatsTitle.textContent = `Miner ${minerIndex + 1} Stats`;
@@ -979,7 +981,7 @@ function runIdleMiners(deltaSeconds: number): void {
         activations += 1;
 
         // Double activation: always roll within min/max range
-        const roll = rollDoubleActivation();
+        const roll = rollDoubleActivation(minerIndex);
         const bonusActivations = getActivationCountFromRoll(roll);
 
         // Activate bonus tiles
@@ -1025,7 +1027,7 @@ function render(): void {
   if (ui.expandMap) ui.expandMap.disabled = !canAfford(mapCost);
   if (ui.coalGenerationCost) ui.coalGenerationCost.textContent = coalCost.toLocaleString();
   if (ui.coalGenerationLevel) ui.coalGenerationLevel.textContent = state.coalGenerationLevel.toString();
-  if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getCoalGenerationStatText() + " • Cost: " + coalCost.toLocaleString();
+  if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getCoalGenerationStatText();
   if (ui.buyCoalGeneration) ui.buyCoalGeneration.disabled = !canAfford(coalCost);
 
   renderMap();
