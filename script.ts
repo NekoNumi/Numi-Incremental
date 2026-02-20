@@ -7,19 +7,21 @@ const MIN_TILE_COVERAGE_IN_RADIUS = 0.3;
 const SPECIALIZATION_COST = 250;
 
 // Type definitions
-interface MinerUpgrade {
+interface Unit {
   speedLevel: number;
   radiusLevel: number;
-  doubleActivationMinLevel: number;
-  doubleActivationMaxLevel: number;
-  veinFinderLevel: number;
-  critChanceLevel: number;
-  critMultiplierLevel: number;
-  chainReactionLevel: number;
   specializationUnlocked: boolean;
-  specialization: MinerSpecialization;
+  specialization: UnitSpecialization;
   targeting: MinerTargeting;
+  specializationData: UnitSpecializationData;
 }
+
+type UnitSpecializationData =
+  | { type: "Worker" }
+  | { type: "Crit Build"; critChanceLevel: number; critMultiplierLevel: number }
+  | { type: "Chain Lightning"; chainReactionLevel: number; chainReactionChanceLevel: number }
+  | { type: "Prospector"; veinFinderLevel: number }
+  | { type: "Multi Activator"; multiActivationMinLevel: number; multiActivationMaxLevel: number };
 
 interface Position {
   x: number;
@@ -54,12 +56,12 @@ interface GameState {
   lastRenderedMapSize: number;
   idleMinerCooldowns: number[];
   idleMinerPositions: (Position | null)[];
-  idleMinerUpgrades: MinerUpgrade[];
+  units: Unit[];
 }
 
 type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold";
 type UpgradableOre = Exclude<OreType, "sand">;
-type MinerSpecialization = "none" | "vein-finder" | "crit" | "chain-lightning" | "double-activation";
+type UnitSpecialization = "Worker" | "Crit Build" | "Chain Lightning" | "Prospector" | "Multi Activator";
 type MinerTargeting = "random" | "high-quality" | "low-quality";
 
 interface InteractionState {
@@ -195,7 +197,7 @@ const state: GameState = {
   lastRenderedMapSize: 0,
   idleMinerCooldowns: [],
   idleMinerPositions: [],
-  idleMinerUpgrades: [],
+  units: [],
 };
 
 const interactionState: InteractionState = {
@@ -438,35 +440,90 @@ function getIdleMinerCost(): number {
   return idleMiner.baseCost * nextCount ** 3;
 }
 
-function getMinerUpgrade(minerIndex: number): MinerUpgrade {
-  const upgrade = state.idleMinerUpgrades[minerIndex];
-  if (!upgrade) {
+function getDefaultSpecializationData(specialization: UnitSpecialization): UnitSpecializationData {
+  switch (specialization) {
+    case "Crit Build":
+      return { type: specialization, critChanceLevel: 0, critMultiplierLevel: 0 };
+    case "Chain Lightning":
+      return { type: specialization, chainReactionLevel: 0, chainReactionChanceLevel: 0 };
+    case "Prospector":
+      return { type: specialization, veinFinderLevel: 0 };
+    case "Multi Activator":
+      return { type: specialization, multiActivationMinLevel: 0, multiActivationMaxLevel: 0 };
+    default:
+      return { type: "Worker" };
+  }
+}
+
+function normalizeSpecialization(value: unknown): UnitSpecialization {
+  switch (value) {
+    case "Prospector":
+      return "Prospector";
+    case "Crit Build":
+      return "Crit Build";
+    case "Chain Lightning":
+      return "Chain Lightning";
+    case "Multi Activator":
+      return "Multi Activator";
+    default:
+      return "Worker";
+  }
+}
+
+function buildSpecializationData(raw: Record<string, unknown>, specialization: UnitSpecialization): UnitSpecializationData {
+  switch (specialization) {
+    case "Crit Build":
+      return {
+        type: "Crit Build",
+        critChanceLevel: Number(raw.critChanceLevel) || 0,
+        critMultiplierLevel: Number(raw.critMultiplierLevel) || 0,
+      };
+    case "Chain Lightning":
+      return {
+        type: "Chain Lightning",
+        chainReactionLevel: Number(raw.chainReactionLevel) || 0,
+        chainReactionChanceLevel: Number(raw.chainReactionChanceLevel) || 0,
+      };
+    case "Prospector":
+      return {
+        type: "Prospector",
+        veinFinderLevel: Number(raw.veinFinderLevel) || 0,
+      };
+    case "Multi Activator":
+      return {
+        type: "Multi Activator",
+        multiActivationMinLevel: Number(raw.multiActivationMinLevel) || 0,
+        multiActivationMaxLevel: Number(raw.multiActivationMaxLevel) || 0,
+      };
+    default:
+      return { type: "Worker" };
+  }
+}
+
+function getMinerUpgrade(minerIndex: number): Unit {
+  const unit = state.units[minerIndex];
+  if (!unit) {
     return {
       speedLevel: 0,
       radiusLevel: 0,
-      doubleActivationMinLevel: 0,
-      doubleActivationMaxLevel: 0,
-      veinFinderLevel: 0,
-      critChanceLevel: 0,
-      critMultiplierLevel: 0,
-      chainReactionLevel: 0,
       specializationUnlocked: false,
-      specialization: "none",
+      specialization: "Worker",
       targeting: "random",
+      specializationData: getDefaultSpecializationData("Worker"),
     };
   }
+
+  const specialization = normalizeSpecialization(unit.specialization);
+  const specializationDataRaw = (unit.specializationData as Record<string, unknown> | undefined) || {};
+  const specializationData = buildSpecializationData(specializationDataRaw, specialization);
+
   return {
-    speedLevel: Number(upgrade.speedLevel) || 0,
-    radiusLevel: Number(upgrade.radiusLevel) || 0,
-    doubleActivationMinLevel: Number(upgrade.doubleActivationMinLevel) || 0,
-    doubleActivationMaxLevel: Number(upgrade.doubleActivationMaxLevel) || 0,
-    veinFinderLevel: Number(upgrade.veinFinderLevel) || 0,
-    critChanceLevel: Number(upgrade.critChanceLevel) || 0,
-    critMultiplierLevel: Number(upgrade.critMultiplierLevel) || 0,
-    chainReactionLevel: Number(upgrade.chainReactionLevel) || 0,
-    specializationUnlocked: Boolean(upgrade.specializationUnlocked),
-    specialization: (upgrade.specialization as MinerSpecialization) || "none",
-    targeting: (upgrade.targeting as MinerTargeting) || "random",
+    speedLevel: Number(unit.speedLevel) || 0,
+    radiusLevel: Number(unit.radiusLevel) || 0,
+    specializationUnlocked: Boolean(unit.specializationUnlocked),
+    specialization,
+    targeting: (unit.targeting as MinerTargeting) || "random",
+    specializationData,
   };
 }
 
@@ -650,41 +707,57 @@ function renderResourceLegend(): void {
 }
 
 function getDoubleActivationMinCost(minerIndex: number): number {
-  return getUpgradeCost(doubleActivationMinUpgrade, getMinerUpgrade(minerIndex).doubleActivationMinLevel);
+  const unit = getMinerUpgrade(minerIndex);
+  const level = unit.specializationData.type === "Multi Activator" ? unit.specializationData.multiActivationMinLevel : 0;
+  return getUpgradeCost(doubleActivationMinUpgrade, level);
 }
 
 function getDoubleActivationMaxCost(minerIndex: number): number {
-  return getUpgradeCost(doubleActivationMaxUpgrade, getMinerUpgrade(minerIndex).doubleActivationMaxLevel);
+  const unit = getMinerUpgrade(minerIndex);
+  const level = unit.specializationData.type === "Multi Activator" ? unit.specializationData.multiActivationMaxLevel : 0;
+  return getUpgradeCost(doubleActivationMaxUpgrade, level);
 }
 
 function getVeinFinderCost(minerIndex: number): number {
-  return getUpgradeCost(veinFinderUpgrade, getMinerUpgrade(minerIndex).veinFinderLevel);
+  const unit = getMinerUpgrade(minerIndex);
+  const level = unit.specializationData.type === "Prospector" ? unit.specializationData.veinFinderLevel : 0;
+  return getUpgradeCost(veinFinderUpgrade, level);
 }
 
 function getCritChanceCost(minerIndex: number): number {
-  return getUpgradeCost(critChanceUpgrade, getMinerUpgrade(minerIndex).critChanceLevel);
+  const unit = getMinerUpgrade(minerIndex);
+  const level = unit.specializationData.type === "Crit Build" ? unit.specializationData.critChanceLevel : 0;
+  return getUpgradeCost(critChanceUpgrade, level);
 }
 
 function getCritMultiplierCost(minerIndex: number): number {
-  return getUpgradeCost(critMultiplierUpgrade, getMinerUpgrade(minerIndex).critMultiplierLevel);
+  const unit = getMinerUpgrade(minerIndex);
+  const level = unit.specializationData.type === "Crit Build" ? unit.specializationData.critMultiplierLevel : 0;
+  return getUpgradeCost(critMultiplierUpgrade, level);
 }
 
 function getChainReactionCost(minerIndex: number): number {
-  return getUpgradeCost(chainReactionUpgrade, getMinerUpgrade(minerIndex).chainReactionLevel);
+  const unit = getMinerUpgrade(minerIndex);
+  const level = unit.specializationData.type === "Chain Lightning" ? unit.specializationData.chainReactionLevel : 0;
+  return getUpgradeCost(chainReactionUpgrade, level);
 }
 
 function getDoubleActivationMinPercent(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "double-activation")) {
+  if (!canUseClass(minerIndex, "Multi Activator")) {
     return 0;
   }
-  return 0.1 + getMinerUpgrade(minerIndex).doubleActivationMinLevel * 0.1;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Multi Activator" ? data.multiActivationMinLevel : 0;
+  return 0.1 + level * 0.1;
 }
 
 function getDoubleActivationMaxPercent(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "double-activation")) {
+  if (!canUseClass(minerIndex, "Multi Activator")) {
     return 0;
   }
-  return 0.2 + getMinerUpgrade(minerIndex).doubleActivationMaxLevel * 0.2;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Multi Activator" ? data.multiActivationMaxLevel : 0;
+  return 0.2 + level * 0.2;
 }
 
 function rollDoubleActivation(minerIndex: number): number {
@@ -752,47 +825,59 @@ function getDoubleActivationMaxStatText(minerIndex: number): string {
 }
 
 function getVeinFinderQualityMultiplier(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "vein-finder")) {
+  if (!canUseClass(minerIndex, "Prospector")) {
     return 1;
   }
-  return 1.25 + getMinerUpgrade(minerIndex).veinFinderLevel * 0.25;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Prospector" ? data.veinFinderLevel : 0;
+  return 1.25 + level * 0.25;
 }
 
 function getVeinFinderStatText(minerIndex: number): string {
-  const level = getMinerUpgrade(minerIndex).veinFinderLevel;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Prospector" ? data.veinFinderLevel : 0;
   const currentBoost = (getVeinFinderQualityMultiplier(minerIndex) - 1) * 100;
   const nextBoost = (1 + (level + 1) * 0.25 - 1) * 100;
   return `Current boost: +${currentBoost.toFixed(0)}% → Upgrading to: +${nextBoost.toFixed(0)}% for mined ore respawn weight`;
 }
 
 function getCritChance(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "crit")) {
+  if (!canUseClass(minerIndex, "Crit Build")) {
     return 0;
   }
-  return Math.min(0.6, 0.1 + getMinerUpgrade(minerIndex).critChanceLevel * 0.03);
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
+  return Math.min(0.6, 0.1 + level * 0.03);
 }
 
 function getCritMultiplier(minerIndex: number): number {
-  return 2 + getMinerUpgrade(minerIndex).critMultiplierLevel * 0.2;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Crit Build" ? data.critMultiplierLevel : 0;
+  return 2 + level * 0.2;
 }
 
 function getChainReactionChance(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "chain-lightning")) {
+  if (!canUseClass(minerIndex, "Chain Lightning")) {
     return 0;
   }
-  return 0.1;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Chain Lightning" ? data.chainReactionChanceLevel : 0;
+  return Math.min(0.5, 0.1 + level * 0.02);
 }
 
 function getChainReactionLength(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "chain-lightning")) {
+  if (!canUseClass(minerIndex, "Chain Lightning")) {
     return 0;
   }
-  return 1 + getMinerUpgrade(minerIndex).chainReactionLevel;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Chain Lightning" ? data.chainReactionLevel : 0;
+  return 1 + level;
 }
 
 function getCritChanceStatText(minerIndex: number): string {
   const current = (getCritChance(minerIndex) * 100).toFixed(0);
-  const level = getMinerUpgrade(minerIndex).critChanceLevel;
+  const data = getMinerUpgrade(minerIndex).specializationData;
+  const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
   const next = (Math.min(0.5, (level + 1) * 0.03) * 100).toFixed(0);
   return `Current chance: ${current}% → Upgrading to: ${next}%`;
 }
@@ -810,68 +895,66 @@ function getChainReactionStatText(minerIndex: number): string {
   return `Current: ${currentChance}% chance, ${currentLength} adjacent chain(s) → Upgrading to: ${nextLength}`;
 }
 
-function getSpecializationLabel(value: MinerSpecialization): string {
+function getSpecializationLabel(value: UnitSpecialization): string {
   switch (value) {
-    case "vein-finder":
-      return "🧭 Vein Finder";
-    case "crit":
-      return "🎯 Critical Strike";
-    case "chain-lightning":
+    case "Prospector":
+      return "🧭 Prospector";
+    case "Crit Build":
+      return "🎯 Crit Build";
+    case "Chain Lightning":
       return "Chain Lightning";
-    case "double-activation":
-      return "⏩ Double Activation";
+    case "Multi Activator":
+      return "⏩ Multi Activator";
     default:
-      return "None";
+      return "Worker";
   }
 }
 
 function getMinerDisplayName(minerIndex: number): string {
   const spec = getMinerUpgrade(minerIndex).specialization;
   const number = minerIndex + 1;
-  if (spec === "none") {
-    return `Miner ${number}`;
-  }
-  return `${getSpecializationLabel(spec)} Miner ${number}`;
+  return `${getSpecializationLabel(spec)} ${number}`;
 }
 
 function getMinerRingLabel(minerIndex: number): string {
   const upgrade = getMinerUpgrade(minerIndex);
-  if (upgrade.specialization === "vein-finder") {
+  if (upgrade.specialization === "Prospector") {
     return `🧭${minerIndex + 1}`;
   }
-  if (upgrade.specialization === "crit") {
+  if (upgrade.specialization === "Crit Build") {
     return `🎯${minerIndex + 1}`;
   }
-  if (upgrade.specialization === "chain-lightning") {
+  if (upgrade.specialization === "Chain Lightning") {
     return `⚡${minerIndex + 1}`;
   }
-  if (upgrade.specialization === "double-activation") {
+  if (upgrade.specialization === "Multi Activator") {
     return `⏩${minerIndex + 1}`;
   }
-  return `M${minerIndex + 1}`;
+  return `W${minerIndex + 1}`;
 }
 
 function canOfferClassUnlock(minerIndex: number): boolean {
   const upgrade = getMinerUpgrade(minerIndex);
-  return !upgrade.specializationUnlocked && upgrade.specialization === "none" && getMinerClicksPerSecond(minerIndex) >= 1;
+  return !upgrade.specializationUnlocked && upgrade.specialization === "Worker" && getMinerClicksPerSecond(minerIndex) >= 1;
 }
 
 function canChooseSpecialization(minerIndex: number): boolean {
   const upgrade = getMinerUpgrade(minerIndex);
-  return upgrade.specializationUnlocked && upgrade.specialization === "none";
+  return upgrade.specializationUnlocked && upgrade.specialization === "Worker";
 }
 
-function canUseClass(minerIndex: number, spec: MinerSpecialization): boolean {
+function canUseClass(minerIndex: number, spec: UnitSpecialization): boolean {
   const selected = getMinerUpgrade(minerIndex).specialization;
   return selected === spec;
 }
 
-function selectMinerSpecialization(spec: Exclude<MinerSpecialization, "none">): void {
+function selectMinerSpecialization(spec: Exclude<UnitSpecialization, "Worker">): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null || !canChooseSpecialization(minerIndex)) {
     return;
   }
-  state.idleMinerUpgrades[minerIndex].specialization = spec;
+  state.units[minerIndex].specialization = spec;
+  state.units[minerIndex].specializationData = getDefaultSpecializationData(spec);
   setClassModalOpen(false);
   render();
 }
@@ -885,7 +968,7 @@ function unlockClassChoice(): void {
     return;
   }
   state.coins -= SPECIALIZATION_COST;
-  state.idleMinerUpgrades[minerIndex].specializationUnlocked = true;
+  state.units[minerIndex].specializationUnlocked = true;
   render();
 }
 
@@ -899,7 +982,7 @@ function setMinerTargeting(mode: MinerTargeting): void {
   if (minerIndex === null) {
     return;
   }
-  state.idleMinerUpgrades[minerIndex].targeting = mode;
+  state.units[minerIndex].targeting = mode;
   renderMinerPopup();
 }
 
@@ -965,7 +1048,7 @@ function saveGame(showStatus: boolean = true): void {
       idleMinerOwned: state.idleMinerOwned,
       idleMinerCooldowns: state.idleMinerCooldowns,
       idleMinerPositions: state.idleMinerPositions,
-      idleMinerUpgrades: state.idleMinerUpgrades,
+      units: state.units,
       mapExpansions: state.mapExpansions,
       coalGenerationLevel: state.coalGenerationLevel,
       copperGenerationLevel: state.copperGenerationLevel,
@@ -997,23 +1080,18 @@ function syncIdleMinerState(): void {
     state.idleMinerPositions.length = state.idleMinerOwned;
   }
 
-  while (state.idleMinerUpgrades.length < state.idleMinerOwned) {
-    state.idleMinerUpgrades.push({
+  while (state.units.length < state.idleMinerOwned) {
+    state.units.push({
       speedLevel: 0,
       radiusLevel: 0,
-      doubleActivationMinLevel: 0,
-      doubleActivationMaxLevel: 0,
-      veinFinderLevel: 0,
-      critChanceLevel: 0,
-      critMultiplierLevel: 0,
-      chainReactionLevel: 0,
       specializationUnlocked: false,
-      specialization: "none",
+      specialization: "Worker",
       targeting: "random",
+      specializationData: getDefaultSpecializationData("Worker"),
     });
   }
-  if (state.idleMinerUpgrades.length > state.idleMinerOwned) {
-    state.idleMinerUpgrades.length = state.idleMinerOwned;
+  if (state.units.length > state.idleMinerOwned) {
+    state.units.length = state.idleMinerOwned;
   }
 
   if (interactionState.selectedMinerIndex !== null && interactionState.selectedMinerIndex >= state.idleMinerOwned) {
@@ -1030,7 +1108,7 @@ function loadGame(): void {
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     state.coins = Number(parsed.coins) || 0;
-    state.idleMinerOwned = Number(parsed.idleMinerOwned ?? (parsed as Record<string, unknown>).cursorOwned) || 0;
+    state.idleMinerOwned = Number(parsed.idleMinerOwned) || 0;
 
     state.idleMinerCooldowns = Array.isArray(parsed.idleMinerCooldowns)
       ? parsed.idleMinerCooldowns.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value >= 0)
@@ -1052,44 +1130,37 @@ function loadGame(): void {
           .filter((position) => position !== null)
       : [];
 
-    const legacySpeedLevel = Number((parsed as Record<string, unknown>).fasterMinerOwned ?? (parsed as Record<string, unknown>).minerOwned) || 0;
-    const legacyRadiusLevel = Number((parsed as Record<string, unknown>).minerRadiusOwned) || 0;
+    const rawUnits = Array.isArray(parsed.units) ? parsed.units : [];
 
-    state.idleMinerUpgrades = Array.isArray(parsed.idleMinerUpgrades)
-      ? parsed.idleMinerUpgrades
-          .map((upgrade: unknown) => {
-            const u = upgrade as Record<string, unknown>;
+    state.units = Array.isArray(rawUnits)
+      ? rawUnits
+          .map((entry: unknown) => {
+            const unit = entry as Record<string, unknown>;
+            const specialization = normalizeSpecialization(unit.specialization);
             return {
-              speedLevel: Number(u?.speedLevel) || 0,
-              radiusLevel: Number(u?.radiusLevel) || 0,
-              doubleActivationMinLevel: Number(u?.doubleActivationMinLevel) || 0,
-              doubleActivationMaxLevel: Number(u?.doubleActivationMaxLevel) || 0,
-              veinFinderLevel: Number(u?.veinFinderLevel) || 0,
-              critChanceLevel: Number(u?.critChanceLevel) || 0,
-              critMultiplierLevel: Number(u?.critMultiplierLevel) || 0,
-              chainReactionLevel: Number(u?.chainReactionLevel) || 0,
-              specializationUnlocked: Boolean(u?.specializationUnlocked),
-              specialization: (u?.specialization as MinerSpecialization) || "none",
-              targeting: (u?.targeting as MinerTargeting) || "random",
+              speedLevel: Number(unit?.speedLevel) || 0,
+              radiusLevel: Number(unit?.radiusLevel) || 0,
+              specializationUnlocked: Boolean(unit?.specializationUnlocked),
+              specialization,
+              targeting: (unit?.targeting as MinerTargeting) || "random",
+              specializationData: buildSpecializationData(
+                ((unit?.specializationData as Record<string, unknown> | undefined) || {}) as Record<string, unknown>,
+                specialization
+              ),
             };
           })
-          .filter((upgrade) => upgrade.speedLevel >= 0 && upgrade.radiusLevel >= 0)
+          .filter((unit) => unit.speedLevel >= 0 && unit.radiusLevel >= 0)
       : [];
 
-    if (state.idleMinerUpgrades.length === 0 && state.idleMinerOwned > 0) {
+    if (state.units.length === 0 && state.idleMinerOwned > 0) {
       for (let index = 0; index < state.idleMinerOwned; index += 1) {
-        state.idleMinerUpgrades.push({
-          speedLevel: legacySpeedLevel,
-          radiusLevel: legacyRadiusLevel,
-          doubleActivationMinLevel: 0,
-          doubleActivationMaxLevel: 0,
-          veinFinderLevel: 0,
-          critChanceLevel: 0,
-          critMultiplierLevel: 0,
-          chainReactionLevel: 0,
+        state.units.push({
+          speedLevel: 0,
+          radiusLevel: 0,
           specializationUnlocked: false,
-          specialization: "none",
+          specialization: "Worker",
           targeting: "random",
+          specializationData: getDefaultSpecializationData("Worker"),
         });
       }
     }
@@ -1434,7 +1505,7 @@ function buyMinerSpeedUpgrade(): void {
 
   const previousCooldown = getMinerCooldownSeconds(minerIndex);
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].speedLevel += 1;
+  state.units[minerIndex].speedLevel += 1;
   const updatedCooldown = getMinerCooldownSeconds(minerIndex);
 
   if (Number.isFinite(previousCooldown) && previousCooldown > 0) {
@@ -1457,7 +1528,7 @@ function buyMinerRadiusUpgrade(): void {
   }
 
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].radiusLevel += 1;
+  state.units[minerIndex].radiusLevel += 1;
   render();
 }
 
@@ -1486,7 +1557,7 @@ function resetGame(): void {
   state.lastRenderedMapSize = 0;
   state.idleMinerCooldowns = [];
   state.idleMinerPositions = [];
-  state.idleMinerUpgrades = [];
+  state.units = [];
   closeMinerPanels();
   render();
   setSettingsModalOpen(false);
@@ -1536,78 +1607,96 @@ function buyGoldGeneration(): void {
 function buyDoubleActivationMin(): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "double-activation")) return;
+  if (!canUseClass(minerIndex, "Multi Activator")) return;
   const cost = getDoubleActivationMinCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].doubleActivationMinLevel += 1;
+  const data = state.units[minerIndex].specializationData;
+  if (data.type === "Multi Activator") {
+    data.multiActivationMinLevel += 1;
+  }
   render();
 }
 
 function buyDoubleActivationMax(): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "double-activation")) return;
+  if (!canUseClass(minerIndex, "Multi Activator")) return;
   const cost = getDoubleActivationMaxCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].doubleActivationMaxLevel += 1;
+  const data = state.units[minerIndex].specializationData;
+  if (data.type === "Multi Activator") {
+    data.multiActivationMaxLevel += 1;
+  }
   render();
 }
 
 function buyVeinFinderUpgrade(): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "vein-finder")) return;
+  if (!canUseClass(minerIndex, "Prospector")) return;
   const cost = getVeinFinderCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].veinFinderLevel += 1;
+  const data = state.units[minerIndex].specializationData;
+  if (data.type === "Prospector") {
+    data.veinFinderLevel += 1;
+  }
   render();
 }
 
 function buyCritChanceUpgrade(): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "crit")) return;
+  if (!canUseClass(minerIndex, "Crit Build")) return;
   const cost = getCritChanceCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].critChanceLevel += 1;
+  const data = state.units[minerIndex].specializationData;
+  if (data.type === "Crit Build") {
+    data.critChanceLevel += 1;
+  }
   render();
 }
 
 function buyCritMultiplierUpgrade(): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "crit")) return;
+  if (!canUseClass(minerIndex, "Crit Build")) return;
   const cost = getCritMultiplierCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].critMultiplierLevel += 1;
+  const data = state.units[minerIndex].specializationData;
+  if (data.type === "Crit Build") {
+    data.critMultiplierLevel += 1;
+  }
   render();
 }
 
 function buyChainReactionUpgrade(): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "chain-lightning")) return;
+  if (!canUseClass(minerIndex, "Chain Lightning")) return;
   const cost = getChainReactionCost(minerIndex);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.idleMinerUpgrades[minerIndex].chainReactionLevel += 1;
+  const data = state.units[minerIndex].specializationData;
+  if (data.type === "Chain Lightning") {
+    data.chainReactionLevel += 1;
+  }
   render();
 }
 
@@ -1703,21 +1792,25 @@ function renderMinerPopup(): void {
   const canSpec = canChooseSpecialization(minerIndex);
   const selectedSpec = upgrade.specialization;
   const specAffordable = canAfford(SPECIALIZATION_COST);
-  const showDoubleActivation = selectedSpec === "double-activation";
-  const showVeinFinder = selectedSpec === "vein-finder";
-  const showCrit = selectedSpec === "crit";
-  const showChainLightning = selectedSpec === "chain-lightning";
+  const showDoubleActivation = selectedSpec === "Multi Activator";
+  const showVeinFinder = selectedSpec === "Prospector";
+  const showCrit = selectedSpec === "Crit Build";
+  const showChainLightning = selectedSpec === "Chain Lightning";
+  const multiData = upgrade.specializationData.type === "Multi Activator" ? upgrade.specializationData : null;
+  const prospectorData = upgrade.specializationData.type === "Prospector" ? upgrade.specializationData : null;
+  const critData = upgrade.specializationData.type === "Crit Build" ? upgrade.specializationData : null;
+  const chainData = upgrade.specializationData.type === "Chain Lightning" ? upgrade.specializationData : null;
 
   ui.minerPopup.classList.remove("hidden");
   if (ui.minerPopupTitle) ui.minerPopupTitle.textContent = getMinerDisplayName(minerIndex);
   if (ui.popupSpeedLevel) ui.popupSpeedLevel.textContent = upgrade.speedLevel.toString();
   if (ui.popupRadiusLevel) ui.popupRadiusLevel.textContent = upgrade.radiusLevel.toString();
-  if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = upgrade.doubleActivationMinLevel.toString();
-  if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = upgrade.doubleActivationMaxLevel.toString();
-  if (ui.popupVeinFinderLevel) ui.popupVeinFinderLevel.textContent = upgrade.veinFinderLevel.toString();
-  if (ui.popupCritChanceLevel) ui.popupCritChanceLevel.textContent = upgrade.critChanceLevel.toString();
-  if (ui.popupCritMultiplierLevel) ui.popupCritMultiplierLevel.textContent = upgrade.critMultiplierLevel.toString();
-  if (ui.popupChainReactionLevel) ui.popupChainReactionLevel.textContent = upgrade.chainReactionLevel.toString();
+  if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = (multiData?.multiActivationMinLevel ?? 0).toString();
+  if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = (multiData?.multiActivationMaxLevel ?? 0).toString();
+  if (ui.popupVeinFinderLevel) ui.popupVeinFinderLevel.textContent = (prospectorData?.veinFinderLevel ?? 0).toString();
+  if (ui.popupCritChanceLevel) ui.popupCritChanceLevel.textContent = (critData?.critChanceLevel ?? 0).toString();
+  if (ui.popupCritMultiplierLevel) ui.popupCritMultiplierLevel.textContent = (critData?.critMultiplierLevel ?? 0).toString();
+  if (ui.popupChainReactionLevel) ui.popupChainReactionLevel.textContent = (chainData?.chainReactionLevel ?? 0).toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = radiusCost.toLocaleString();
   if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = doubleActivationMinCost.toLocaleString();
@@ -1735,7 +1828,7 @@ function renderMinerPopup(): void {
   if (ui.popupCritMultiplierStat) ui.popupCritMultiplierStat.textContent = getCritMultiplierStatText(minerIndex);
   if (ui.popupChainReactionStat) ui.popupChainReactionStat.textContent = getChainReactionStatText(minerIndex);
   if (ui.popupSpecStatus) {
-    if (selectedSpec !== "none") {
+    if (selectedSpec !== "Worker") {
       ui.popupSpecStatus.textContent = `Specialization: ${getSpecializationLabel(selectedSpec)}`;
     } else if (canSpec) {
       ui.popupSpecStatus.textContent = "Class unlocked. Choose specialization";
@@ -1774,12 +1867,12 @@ function renderMinerPopup(): void {
 
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !canAfford(speedCost);
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !canAfford(radiusCost);
-  if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !canAfford(doubleActivationMinCost) || !canUseClass(minerIndex, "double-activation");
-  if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.disabled = !canAfford(doubleActivationMaxCost) || !canUseClass(minerIndex, "double-activation");
-  if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.disabled = !canAfford(veinFinderCost) || !canUseClass(minerIndex, "vein-finder");
-  if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.disabled = !canAfford(critChanceCost) || !canUseClass(minerIndex, "crit");
-  if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.disabled = !canAfford(critMultiplierCost) || !canUseClass(minerIndex, "crit");
-  if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.disabled = !canAfford(chainReactionCost) || !canUseClass(minerIndex, "chain-lightning");
+  if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !canAfford(doubleActivationMinCost) || !canUseClass(minerIndex, "Multi Activator");
+  if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.disabled = !canAfford(doubleActivationMaxCost) || !canUseClass(minerIndex, "Multi Activator");
+  if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.disabled = !canAfford(veinFinderCost) || !canUseClass(minerIndex, "Prospector");
+  if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.disabled = !canAfford(critChanceCost) || !canUseClass(minerIndex, "Crit Build");
+  if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.disabled = !canAfford(critMultiplierCost) || !canUseClass(minerIndex, "Crit Build");
+  if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.disabled = !canAfford(chainReactionCost) || !canUseClass(minerIndex, "Chain Lightning");
   if (ui.popupReposition) ui.popupReposition.textContent = interactionState.placementMode ? "Click map to place…" : "Reposition";
 }
 
@@ -2135,16 +2228,16 @@ if (ui.popupChooseClass) {
   ui.popupChooseClass.addEventListener("click", () => setClassModalOpen(true));
 }
 if (ui.classPickVeinFinder) {
-  ui.classPickVeinFinder.addEventListener("click", () => selectMinerSpecialization("vein-finder"));
+  ui.classPickVeinFinder.addEventListener("click", () => selectMinerSpecialization("Prospector"));
 }
 if (ui.classPickCrit) {
-  ui.classPickCrit.addEventListener("click", () => selectMinerSpecialization("crit"));
+  ui.classPickCrit.addEventListener("click", () => selectMinerSpecialization("Crit Build"));
 }
 if (ui.classPickChainLightning) {
-  ui.classPickChainLightning.addEventListener("click", () => selectMinerSpecialization("chain-lightning"));
+  ui.classPickChainLightning.addEventListener("click", () => selectMinerSpecialization("Chain Lightning"));
 }
 if (ui.classPickDoubleActivation) {
-  ui.classPickDoubleActivation.addEventListener("click", () => selectMinerSpecialization("double-activation"));
+  ui.classPickDoubleActivation.addEventListener("click", () => selectMinerSpecialization("Multi Activator"));
 }
 if (ui.classModalClose) {
   ui.classModalClose.addEventListener("click", () => setClassModalOpen(false));
