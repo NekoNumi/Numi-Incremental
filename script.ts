@@ -80,6 +80,7 @@ interface UIElements {
   coalGenerationCost: HTMLElement | null;
   coalGenerationLevel: HTMLElement | null;
   buyCoalGeneration: HTMLButtonElement | null;
+  closeMinerPopupButton: HTMLButtonElement | null;
 }
 
 // State
@@ -157,6 +158,7 @@ const ui: UIElements = {
   coalGenerationCost: document.getElementById("coal-generation-cost"),
   coalGenerationLevel: document.getElementById("coal-generation-level"),
   buyCoalGeneration: document.getElementById("buy-coal-generation") as HTMLButtonElement,
+  closeMinerPopupButton: document.getElementById("close-miner-popup") as HTMLButtonElement,
 };
 
 // Utility functions
@@ -891,10 +893,8 @@ if (ui.mapEnvironment) {
     if (!(target instanceof HTMLElement)) {
       return;
     }
-    if (target.closest(".miner-popup") || target.closest(".miner-node")) {
-      return;
-    }
-    closeMinerPopup();
+    // Don't close the popup when interacting with map tiles
+    // The popup persists until X is clicked or another miner is selected
   });
 }
 
@@ -906,6 +906,9 @@ if (ui.popupUpgradeRadius) {
 }
 if (ui.popupReposition) {
   ui.popupReposition.addEventListener("click", toggleMinerRepositionMode);
+}
+if (ui.closeMinerPopupButton) {
+  ui.closeMinerPopupButton.addEventListener("click", closeMinerPopup);
 }
 if (ui.buyIdleMiner) {
   ui.buyIdleMiner.addEventListener("click", buyIdleMiner);

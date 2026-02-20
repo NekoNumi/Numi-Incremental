@@ -55,7 +55,10 @@
           </button>
 
           <section id="miner-popup" class="miner-popup hidden" aria-label="Miner options">
-            <h3 id="miner-popup-title">Miner</h3>
+            <div class="miner-popup-header">
+              <h3 id="miner-popup-title">Miner</h3>
+              <button id="close-miner-popup" class="close-button" aria-label="Close miner panel">✕</button>
+            </div>
             <button id="popup-upgrade-speed" class="upgrade">
               <span>Faster Miner</span>
               <small>+0.1 activations/sec • Cost: <span id="popup-speed-cost">0</span></small>
