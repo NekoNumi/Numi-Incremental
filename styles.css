@@ -118,7 +118,7 @@ strong {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .modal {

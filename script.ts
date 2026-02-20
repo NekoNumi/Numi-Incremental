@@ -675,11 +675,17 @@ function getChainReactionCost(minerIndex: number): number {
 }
 
 function getDoubleActivationMinPercent(minerIndex: number): number {
-  return getMinerUpgrade(minerIndex).doubleActivationMinLevel * 0.1;
+  if (!canUseClass(minerIndex, "double-activation")) {
+    return 0;
+  }
+  return 0.1 + getMinerUpgrade(minerIndex).doubleActivationMinLevel * 0.1;
 }
 
 function getDoubleActivationMaxPercent(minerIndex: number): number {
-  return getMinerUpgrade(minerIndex).doubleActivationMaxLevel * 0.2;
+  if (!canUseClass(minerIndex, "double-activation")) {
+    return 0;
+  }
+  return 0.2 + getMinerUpgrade(minerIndex).doubleActivationMaxLevel * 0.2;
 }
 
 function rollDoubleActivation(minerIndex: number): number {
@@ -734,21 +740,22 @@ function getMinerRadiusStatText(minerIndex: number): string {
 }
 
 function getDoubleActivationMinStatText(minerIndex: number): string {
-  const level = getMinerUpgrade(minerIndex).doubleActivationMinLevel;
-  const current = (level * 0.1 * 100).toFixed(0);
-  const next = ((level + 1) * 0.1 * 100).toFixed(0);
+  const current = (getDoubleActivationMinPercent(minerIndex) * 100).toFixed(0);
+  const next = ((getDoubleActivationMinPercent(minerIndex) + 0.1) * 100).toFixed(0);
   return `Current min: ${current}% → Upgrading to: ${next}%`;
 }
 
 function getDoubleActivationMaxStatText(minerIndex: number): string {
-  const level = getMinerUpgrade(minerIndex).doubleActivationMaxLevel;
-  const current = (level * 0.2 * 100).toFixed(0);
-  const next = ((level + 1) * 0.2 * 100).toFixed(0);
+  const current = (getDoubleActivationMaxPercent(minerIndex) * 100).toFixed(0);
+  const next = ((getDoubleActivationMaxPercent(minerIndex) + 0.2) * 100).toFixed(0);
   return `Current max: ${current}% → Upgrading to: ${next}%`;
 }
 
 function getVeinFinderQualityMultiplier(minerIndex: number): number {
-  return 1 + getMinerUpgrade(minerIndex).veinFinderLevel * 0.25;
+  if (!canUseClass(minerIndex, "vein-finder")) {
+    return 1;
+  }
+  return 1.25 + getMinerUpgrade(minerIndex).veinFinderLevel * 0.25;
 }
 
 function getVeinFinderStatText(minerIndex: number): string {
@@ -759,7 +766,10 @@ function getVeinFinderStatText(minerIndex: number): string {
 }
 
 function getCritChance(minerIndex: number): number {
-  return Math.min(0.5, getMinerUpgrade(minerIndex).critChanceLevel * 0.03);
+  if (!canUseClass(minerIndex, "crit")) {
+    return 0;
+  }
+  return Math.min(0.6, 0.1 + getMinerUpgrade(minerIndex).critChanceLevel * 0.03);
 }
 
 function getCritMultiplier(minerIndex: number): number {
@@ -767,11 +777,17 @@ function getCritMultiplier(minerIndex: number): number {
 }
 
 function getChainReactionChance(minerIndex: number): number {
-  return getMinerUpgrade(minerIndex).chainReactionLevel > 0 ? 0.1 : 0;
+  if (!canUseClass(minerIndex, "chain-lightning")) {
+    return 0;
+  }
+  return 0.1;
 }
 
 function getChainReactionLength(minerIndex: number): number {
-  return getMinerUpgrade(minerIndex).chainReactionLevel;
+  if (!canUseClass(minerIndex, "chain-lightning")) {
+    return 0;
+  }
+  return 1 + getMinerUpgrade(minerIndex).chainReactionLevel;
 }
 
 function getCritChanceStatText(minerIndex: number): string {
@@ -791,22 +807,19 @@ function getChainReactionStatText(minerIndex: number): string {
   const currentChance = (getChainReactionChance(minerIndex) * 100).toFixed(0);
   const currentLength = getChainReactionLength(minerIndex);
   const nextLength = currentLength + 1;
-  if (currentLength <= 0) {
-    return `Locked. ${currentChance}% chance → Unlocks 1 adjacent chain`;
-  }
   return `Current: ${currentChance}% chance, ${currentLength} adjacent chain(s) → Upgrading to: ${nextLength}`;
 }
 
 function getSpecializationLabel(value: MinerSpecialization): string {
   switch (value) {
     case "vein-finder":
-      return "Vein Finder";
+      return "🧭 Vein Finder";
     case "crit":
-      return "Critical Strike";
+      return "🎯 Critical Strike";
     case "chain-lightning":
       return "Chain Lightning";
     case "double-activation":
-      return "Double Activation";
+      return "⏩ Double Activation";
     default:
       return "None";
   }
@@ -819,6 +832,23 @@ function getMinerDisplayName(minerIndex: number): string {
     return `Miner ${number}`;
   }
   return `${getSpecializationLabel(spec)} Miner ${number}`;
+}
+
+function getMinerRingLabel(minerIndex: number): string {
+  const upgrade = getMinerUpgrade(minerIndex);
+  if (upgrade.specialization === "vein-finder") {
+    return `🧭${minerIndex + 1}`;
+  }
+  if (upgrade.specialization === "crit") {
+    return `🎯${minerIndex + 1}`;
+  }
+  if (upgrade.specialization === "chain-lightning") {
+    return `⚡${minerIndex + 1}`;
+  }
+  if (upgrade.specialization === "double-activation") {
+    return `⏩${minerIndex + 1}`;
+  }
+  return `M${minerIndex + 1}`;
 }
 
 function canOfferClassUnlock(minerIndex: number): boolean {
@@ -1075,9 +1105,10 @@ function loadGame(): void {
     const now = Date.now();
     const savedAt = Number(parsed.savedAt) || now;
     const secondsAway = Math.min((now - savedAt) / 1000, 8 * 60 * 60);
-    state.coins += getCoinsPerSecond() * secondsAway;
+    const awayCoins = round(getCoinsPerSecond() * secondsAway, 0);
+    state.coins += awayCoins;
 
-    setStatus(`Welcome back! Earned ${round(getCoinsPerSecond() * secondsAway, 0).toLocaleString()} while away.`);
+    setStatus(`Welcome back! Earned ${awayCoins.toLocaleString()} while away.`);
   } catch {
     setStatus("Save data was invalid and has been ignored.");
   }
@@ -1623,7 +1654,7 @@ function renderMinerRing(): void {
     minerNode.style.setProperty("--miner-radius", `${getMinerEffectRadiusPx(index)}px`);
     minerNode.style.left = `calc(50% + ${x}px)`;
     minerNode.style.top = `calc(50% + ${y}px)`;
-    minerNode.innerHTML = `<strong>${getMinerDisplayName(index)}</strong>${cooldownLeft.toFixed(1)}s`;
+    minerNode.innerHTML = `<strong>${getMinerRingLabel(index)}</strong>${cooldownLeft.toFixed(1)}s`;
     ui.minerRing.appendChild(minerNode);
   }
 }
