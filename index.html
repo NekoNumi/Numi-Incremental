@@ -61,69 +61,75 @@
         </section>
 
         <section class="panel upgrades" aria-label="Upgrades">
-          <h2>Upgrades</h2>
-          <button id="buy-idle-miner" class="upgrade">
-            <div class="upgrade-header">
-              <span>Idle Miner</span>
-              <strong class="upgrade-quantity" id="idle-miner-owned">0</strong>
-            </div>
-            <small>Activates 1 random tile every 5s</small>
-            <span class="upgrade-cost-row">Cost: <span id="idle-miner-cost">10</span></span>
-          </button>
+          <div class="upgrades-header">
+            <h2>Upgrades</h2>
+            <button id="toggle-upgrades-accordion" class="close-button" aria-label="Collapse upgrades" aria-expanded="true">▾</button>
+          </div>
 
-          <button id="expand-map" class="upgrade">
-            <div class="upgrade-header">
-              <span>Expand Map</span>
-              <strong class="upgrade-quantity" id="map-expansions">0</strong>
-            </div>
-            <small>Increase map dimensions by 1</small>
-            <span class="upgrade-cost-row">Cost: <span id="map-expand-cost">10</span></span>
-          </button>
+          <div id="upgrades-accordion-body" class="upgrades-accordion-body">
+            <button id="buy-idle-miner" class="upgrade">
+              <div class="upgrade-header">
+                <span>Idle Miner</span>
+                <strong class="upgrade-quantity" id="idle-miner-owned">0</strong>
+              </div>
+              <small>Activates 1 random tile every 5s</small>
+              <span class="upgrade-cost-row">Cost: <span id="idle-miner-cost">10</span></span>
+            </button>
 
-          <button id="buy-coal-generation" class="upgrade">
-            <div class="upgrade-header">
-              <span>Coal Generation</span>
-              <strong class="upgrade-quantity" id="coal-generation-level">0</strong>
-            </div>
-            <small id="coal-generation-stat">Current: 5.0% → Upgrading to: 7.5% chance for coal tiles (3 coins)</small>
-            <span class="upgrade-cost-row">Cost: <span id="coal-generation-cost">75</span></span>
-          </button>
+            <button id="expand-map" class="upgrade">
+              <div class="upgrade-header">
+                <span>Expand Map</span>
+                <strong class="upgrade-quantity" id="map-expansions">0</strong>
+              </div>
+              <small>Increase map dimensions by 1</small>
+              <span class="upgrade-cost-row">Cost: <span id="map-expand-cost">10</span></span>
+            </button>
 
-          <button id="buy-copper-generation" class="upgrade">
-            <div class="upgrade-header">
-              <span>Copper Generation</span>
-              <strong class="upgrade-quantity" id="copper-generation-level">0</strong>
-            </div>
-            <small id="copper-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
-            <span class="upgrade-cost-row">Cost: <span id="copper-generation-cost">120</span></span>
-          </button>
+            <button id="buy-coal-generation" class="upgrade">
+              <div class="upgrade-header">
+                <span>Coal Generation</span>
+                <strong class="upgrade-quantity" id="coal-generation-level">0</strong>
+              </div>
+              <small id="coal-generation-stat">Locked. Weight: 0 → 600 on first upgrade</small>
+              <span class="upgrade-cost-row">Cost: <span id="coal-generation-cost">75</span></span>
+            </button>
 
-          <button id="buy-iron-generation" class="upgrade">
-            <div class="upgrade-header">
-              <span>Iron Generation</span>
-              <strong class="upgrade-quantity" id="iron-generation-level">0</strong>
-            </div>
-            <small id="iron-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
-            <span class="upgrade-cost-row">Cost: <span id="iron-generation-cost">220</span></span>
-          </button>
+            <button id="buy-copper-generation" class="upgrade">
+              <div class="upgrade-header">
+                <span>Copper Generation</span>
+                <strong class="upgrade-quantity" id="copper-generation-level">0</strong>
+              </div>
+              <small id="copper-generation-stat">Locked. Weight: 0 → 140 on first upgrade</small>
+              <span class="upgrade-cost-row">Cost: <span id="copper-generation-cost">120</span></span>
+            </button>
 
-          <button id="buy-silver-generation" class="upgrade">
-            <div class="upgrade-header">
-              <span>Silver Generation</span>
-              <strong class="upgrade-quantity" id="silver-generation-level">0</strong>
-            </div>
-            <small id="silver-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
-            <span class="upgrade-cost-row">Cost: <span id="silver-generation-cost">420</span></span>
-          </button>
+            <button id="buy-iron-generation" class="upgrade">
+              <div class="upgrade-header">
+                <span>Iron Generation</span>
+                <strong class="upgrade-quantity" id="iron-generation-level">0</strong>
+              </div>
+              <small id="iron-generation-stat">Locked. Weight: 0 → 45 on first upgrade</small>
+              <span class="upgrade-cost-row">Cost: <span id="iron-generation-cost">220</span></span>
+            </button>
 
-          <button id="buy-gold-generation" class="upgrade">
-            <div class="upgrade-header">
-              <span>Gold Generation</span>
-              <strong class="upgrade-quantity" id="gold-generation-level">0</strong>
-            </div>
-            <small id="gold-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
-            <span class="upgrade-cost-row">Cost: <span id="gold-generation-cost">800</span></span>
-          </button>
+            <button id="buy-silver-generation" class="upgrade">
+              <div class="upgrade-header">
+                <span>Silver Generation</span>
+                <strong class="upgrade-quantity" id="silver-generation-level">0</strong>
+              </div>
+              <small id="silver-generation-stat">Locked. Weight: 0 → 12 on first upgrade</small>
+              <span class="upgrade-cost-row">Cost: <span id="silver-generation-cost">420</span></span>
+            </button>
+
+            <button id="buy-gold-generation" class="upgrade">
+              <div class="upgrade-header">
+                <span>Gold Generation</span>
+                <strong class="upgrade-quantity" id="gold-generation-level">0</strong>
+              </div>
+              <small id="gold-generation-stat">Locked. Weight: 0 → 3 on first upgrade</small>
+              <span class="upgrade-cost-row">Cost: <span id="gold-generation-cost">800</span></span>
+            </button>
+          </div>
 
           <section id="miner-popup" class="miner-popup hidden" aria-label="Miner options">
             <div class="miner-popup-header">

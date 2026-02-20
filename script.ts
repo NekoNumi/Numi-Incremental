@@ -57,6 +57,7 @@ interface InteractionState {
   selectedMinerIndex: number | null;
   repositionMode: boolean;
   placementMode: boolean;
+  upgradesAccordionOpen: boolean;
   upgradePanelOpen: boolean;
   statsPanelOpen: boolean;
   resourceStatsOpen: boolean;
@@ -69,6 +70,8 @@ interface UIElements {
   idleMinerOwned: HTMLElement | null;
   settingsToggle: HTMLElement | null;
   settingsModal: HTMLElement | null;
+  upgradesAccordionBody: HTMLElement | null;
+  toggleUpgradesAccordion: HTMLButtonElement | null;
   buyIdleMiner: HTMLButtonElement | null;
   save: HTMLButtonElement | null;
   reset: HTMLButtonElement | null;
@@ -158,6 +161,7 @@ const interactionState: InteractionState = {
   selectedMinerIndex: null,
   repositionMode: false,
   placementMode: false,
+  upgradesAccordionOpen: true,
   upgradePanelOpen: false,
   statsPanelOpen: false,
   resourceStatsOpen: false,
@@ -218,10 +222,10 @@ const BASE_ORE_WEIGHTS: Record<OreType, number> = {
 const ORE_REWARDS: Record<OreType, number> = {
   sand: 1,
   coal: 3,
-  copper: 6,
-  iron: 12,
-  silver: 24,
-  gold: 48,
+  copper: 10,
+  iron: 25,
+  silver: 66,
+  gold: 200,
 };
 
 const ORE_ORDER: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
@@ -244,6 +248,8 @@ const ui: UIElements = {
   idleMinerOwned: document.getElementById("idle-miner-owned"),
   settingsToggle: document.getElementById("settings-toggle"),
   settingsModal: document.getElementById("settings-modal"),
+  upgradesAccordionBody: document.getElementById("upgrades-accordion-body"),
+  toggleUpgradesAccordion: document.getElementById("toggle-upgrades-accordion") as HTMLButtonElement,
   buyIdleMiner: document.getElementById("buy-idle-miner") as HTMLButtonElement,
   save: document.getElementById("save") as HTMLButtonElement,
   reset: document.getElementById("reset") as HTMLButtonElement,
@@ -335,7 +341,7 @@ function getMapExpansionCost(): number {
 
 function getIdleMinerCost(): number {
   const nextCount = state.idleMinerOwned + 1;
-  return idleMiner.baseCost * nextCount ** 2;
+  return idleMiner.baseCost * nextCount ** 3;
 }
 
 function getMinerUpgrade(minerIndex: number): MinerUpgrade {
@@ -433,11 +439,15 @@ function setOreGenerationLevel(ore: UpgradableOre, level: number): void {
   }
 }
 
-function getOreUpgradeMultiplier(level: number): number {
-  if (level <= 0) {
-    return 1;
+function getOreWeightForLevel(ore: OreType, level: number): number {
+  const baseWeight = BASE_ORE_WEIGHTS[ore];
+  if (ore === "sand") {
+    return baseWeight;
   }
-  return 1.05 + Math.max(0, level - 1) * 0.025;
+  if (level <= 0) {
+    return 0;
+  }
+  return baseWeight * 1.2 ** (level - 1);
 }
 
 function getOreGenerationCost(ore: UpgradableOre): number {
@@ -445,12 +455,8 @@ function getOreGenerationCost(ore: UpgradableOre): number {
 }
 
 function getOreEffectiveWeight(ore: OreType): number {
-  const baseWeight = BASE_ORE_WEIGHTS[ore];
-  if (ore === "sand") {
-    return baseWeight;
-  }
-  const level = getOreGenerationLevel(ore);
-  return Math.max(0.001, baseWeight * getOreUpgradeMultiplier(level));
+  const level = ore === "sand" ? 1 : getOreGenerationLevel(ore);
+  return getOreWeightForLevel(ore, level);
 }
 
 function rollTileType(): OreType {
@@ -463,11 +469,11 @@ function rollTileType(): OreType {
     { ore: "gold", weight: getOreEffectiveWeight("gold") },
   ];
 
-  const totalWeight = weights.reduce((sum, entry) => sum + Math.max(0.001, entry.weight), 0);
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
   let roll = Math.random() * totalWeight;
 
   for (const entry of weights) {
-    roll -= Math.max(0.001, entry.weight);
+    roll -= entry.weight;
     if (roll <= 0) {
       return entry.ore;
     }
@@ -543,11 +549,12 @@ function getActivationCountFromRoll(roll: number): number {
 // Stat display functions for showing current vs next level
 function getOreGenerationStatText(ore: UpgradableOre): string {
   const currentLevel = getOreGenerationLevel(ore);
-  const currentBonusPercent = (getOreUpgradeMultiplier(currentLevel) - 1) * 100;
-  const nextBonusPercent = (getOreUpgradeMultiplier(currentLevel + 1) - 1) * 100;
-  const currentWeight = getOreEffectiveWeight(ore);
-  const nextWeight = BASE_ORE_WEIGHTS[ore] * getOreUpgradeMultiplier(currentLevel + 1);
-  return `Weight: ${round(currentWeight, 2).toLocaleString()} → ${round(nextWeight, 2).toLocaleString()} (+${currentBonusPercent.toFixed(1)}% → +${nextBonusPercent.toFixed(1)}%)`;
+  const currentWeight = getOreWeightForLevel(ore, currentLevel);
+  const nextWeight = getOreWeightForLevel(ore, currentLevel + 1);
+  if (currentLevel <= 0) {
+    return `Locked. Weight: 0 → ${round(nextWeight, 2).toLocaleString()} on first upgrade`;
+  }
+  return `Weight: ${round(currentWeight, 2).toLocaleString()} → ${round(nextWeight, 2).toLocaleString()} (+20%)`;
 }
 
 function getMinerSpeedStatText(minerIndex: number): string {
@@ -849,6 +856,25 @@ function toggleResourceStatsPanel(): void {
 function closeResourceStatsPanel(): void {
   interactionState.resourceStatsOpen = false;
   renderResourceStatsPanel();
+}
+
+function renderUpgradesAccordion(): void {
+  if (ui.upgradesAccordionBody) {
+    ui.upgradesAccordionBody.classList.toggle("hidden", !interactionState.upgradesAccordionOpen);
+  }
+  if (ui.toggleUpgradesAccordion) {
+    ui.toggleUpgradesAccordion.textContent = interactionState.upgradesAccordionOpen ? "▾" : "▸";
+    ui.toggleUpgradesAccordion.setAttribute("aria-expanded", String(interactionState.upgradesAccordionOpen));
+    ui.toggleUpgradesAccordion.setAttribute(
+      "aria-label",
+      interactionState.upgradesAccordionOpen ? "Collapse upgrades" : "Expand upgrades"
+    );
+  }
+}
+
+function toggleUpgradesAccordion(): void {
+  interactionState.upgradesAccordionOpen = !interactionState.upgradesAccordionOpen;
+  renderUpgradesAccordion();
 }
 
 function closeMinerUpgradePanel(): void {
@@ -1333,6 +1359,7 @@ function render(): void {
   if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost);
 
   renderMap();
+  renderUpgradesAccordion();
   renderResourceStatsPanel();
   renderResourceLegend();
   renderMinerRing();
@@ -1471,6 +1498,9 @@ if (ui.closeMinerPopupButton) {
 }
 if (ui.closeMinerStatsButton) {
   ui.closeMinerStatsButton.addEventListener("click", closeMinerStatsPanel);
+}
+if (ui.toggleUpgradesAccordion) {
+  ui.toggleUpgradesAccordion.addEventListener("click", toggleUpgradesAccordion);
 }
 if (ui.resourceStatsToggle) {
   ui.resourceStatsToggle.addEventListener("click", toggleResourceStatsPanel);

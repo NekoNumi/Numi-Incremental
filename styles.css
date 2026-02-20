@@ -100,6 +100,21 @@ strong {
   gap: 0.75rem;
 }
 
+.upgrades-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.upgrades-accordion-body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.upgrades-accordion-body.hidden {
+  display: none !important;
+}
+
 .hidden {
   display: none;
 }
