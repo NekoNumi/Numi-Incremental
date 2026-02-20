@@ -1,5 +1,5 @@
 import type { GameState, MinerTargeting, ResourceConfig } from "./game-types";
-import { createDefaultResources } from "./resources";
+import { createDefaultResources, createEmptyInventory } from "./resources";
 import { buildSpecializationData, getDefaultSpecializationData, normalizeSpecialization } from "./unit-specialization";
 
 interface LoadOutcome {
@@ -19,6 +19,7 @@ export function saveGameState(saveKey: string, state: GameState, storage: Storag
       units: state.units,
       mapExpansions: state.mapExpansions,
       resources: state.resources,
+      inventory: state.inventory,
       savedAt: Date.now(),
     })
   );
@@ -103,6 +104,7 @@ export function loadGameState(
 
     state.mapExpansions = Number(parsed.mapExpansions) || 0;
     state.resources = createDefaultResources();
+    state.inventory = createEmptyInventory();
     if (Array.isArray(parsed.resources)) {
       for (const entry of parsed.resources) {
         const resource = entry as Partial<ResourceConfig>;
@@ -115,6 +117,16 @@ export function loadGameState(
         }
         existing.resourceLevel = Math.max(0, Number(resource.resourceLevel) || 0);
       }
+    }
+
+    const parsedInventory = parsed.inventory as Record<string, unknown> | undefined;
+    if (parsedInventory && typeof parsedInventory === "object") {
+      state.inventory.sand = Math.max(0, Number(parsedInventory.sand) || 0);
+      state.inventory.coal = Math.max(0, Number(parsedInventory.coal) || 0);
+      state.inventory.copper = Math.max(0, Number(parsedInventory.copper) || 0);
+      state.inventory.iron = Math.max(0, Number(parsedInventory.iron) || 0);
+      state.inventory.silver = Math.max(0, Number(parsedInventory.silver) || 0);
+      state.inventory.gold = Math.max(0, Number(parsedInventory.gold) || 0);
     }
 
     syncIdleMinerState();

@@ -1,4 +1,4 @@
-import type { ResourceConfig } from "./game-types";
+import type { ResourceConfig, ResourceInventory } from "./game-types";
 
 export const DEFAULT_RESOURCES: ResourceConfig[] = [
   { ore: "sand", name: "Sand", weight: 9200, value: 1, baseCost: 0, growth: 1, resourceLevel: 0 },
@@ -11,4 +11,15 @@ export const DEFAULT_RESOURCES: ResourceConfig[] = [
 
 export function createDefaultResources(): ResourceConfig[] {
   return DEFAULT_RESOURCES.map((resource) => ({ ...resource }));
+}
+
+export function createEmptyInventory(): ResourceInventory {
+  return {
+    sand: 0,
+    coal: 0,
+    copper: 0,
+    iron: 0,
+    silver: 0,
+    gold: 0,
+  };
 }

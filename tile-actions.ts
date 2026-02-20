@@ -2,8 +2,7 @@ import type { OreType, UpgradableOre } from "./game-types";
 
 interface CreateTileActionsArgs {
   mapGrid: HTMLElement | null;
-  addCoins: (amount: number) => void;
-  getTileCoinValue: (tileType: OreType) => number;
+  addInventory: (ore: OreType, amount: number) => void;
   getCritChance: (minerIndex: number) => number;
   getCritMultiplier: (minerIndex: number) => number;
   getVeinFinderQualityMultiplier: (minerIndex: number) => number;
@@ -23,8 +22,7 @@ export function createTileActions(args: CreateTileActionsArgs): {
 } {
   const {
     mapGrid,
-    addCoins,
-    getTileCoinValue,
+    addInventory,
     getCritChance,
     getCritMultiplier,
     getVeinFinderQualityMultiplier,
@@ -71,11 +69,11 @@ export function createTileActions(args: CreateTileActionsArgs): {
     }
 
     const tileType = (tile.dataset.tileType as OreType) || "sand";
-    let payout = getTileCoinValue(tileType);
-    if (minerIndex !== null && Math.random() < getCritChance(minerIndex)) {
-      payout *= getCritMultiplier(minerIndex);
-    }
-    addCoins(payout);
+    const isCrit = minerIndex !== null && Math.random() < getCritChance(minerIndex);
+    const critMultiplier = minerIndex !== null ? getCritMultiplier(minerIndex) : 1;
+
+    const quantity = isCrit ? Math.max(1, Math.round(critMultiplier)) : 1;
+    addInventory(tileType, quantity);
 
     tile.classList.add("map-tile--cooldown");
     tile.dataset.tileType = "sand";

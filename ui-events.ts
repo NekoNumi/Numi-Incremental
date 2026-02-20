@@ -3,6 +3,9 @@ import type { UnitSpecialization } from "./game-types";
 interface UiRefs {
   settingsToggle: HTMLElement | null;
   settingsModal: HTMLElement | null;
+  inventoryToggle: HTMLButtonElement | null;
+  inventoryModal: HTMLElement | null;
+  closeInventoryModal: HTMLButtonElement | null;
   mapGrid: HTMLElement | null;
   minerRing: HTMLElement | null;
   mapEnvironment: HTMLElement | null;
@@ -14,6 +17,9 @@ interface UiRefs {
   toggleUpgradesAccordion: HTMLButtonElement | null;
   resourceStatsToggle: HTMLButtonElement | null;
   closeResourceStatsButton: HTMLButtonElement | null;
+  sellAllResources: HTMLButtonElement | null;
+  resourceLegendBody: HTMLElement | null;
+  inventoryList: HTMLElement | null;
   buyIdleMiner: HTMLButtonElement | null;
   expandMap: HTMLButtonElement | null;
   buyCoalGeneration: HTMLButtonElement | null;
@@ -50,6 +56,7 @@ interface BindUiEventsArgs {
   closeMinerPanels: () => void;
   closeResourceStatsPanel: () => void;
   setClassModalOpen: (isOpen: boolean) => void;
+  setInventoryModalOpen: (isOpen: boolean) => void;
   activateTile: (tile: HTMLElement) => void;
   openMinerPanels: (minerIndex: number) => void;
   moveMinerToPointer: (clientX: number, clientY: number) => void;
@@ -68,6 +75,9 @@ interface BindUiEventsArgs {
   buyIronGeneration: () => void;
   buySilverGeneration: () => void;
   buyGoldGeneration: () => void;
+  sellOneResource: (ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold") => void;
+  sellAllByResource: (ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold") => void;
+  sellAllResources: () => void;
   buyDoubleActivationMin: () => void;
   buyDoubleActivationMax: () => void;
   buyVeinFinderUpgrade: () => void;
@@ -90,6 +100,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     closeMinerPanels,
     closeResourceStatsPanel,
     setClassModalOpen,
+    setInventoryModalOpen,
     activateTile,
     openMinerPanels,
     moveMinerToPointer,
@@ -108,6 +119,9 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     buyIronGeneration,
     buySilverGeneration,
     buyGoldGeneration,
+    sellOneResource,
+    sellAllByResource,
+    sellAllResources,
     buyDoubleActivationMin,
     buyDoubleActivationMax,
     buyVeinFinderUpgrade,
@@ -142,12 +156,40 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     });
   }
 
+  if (ui.inventoryToggle) {
+    ui.inventoryToggle.addEventListener("click", () => {
+      if (!ui.inventoryModal) return;
+      const isHidden = ui.inventoryModal.classList.contains("hidden");
+      setInventoryModalOpen(isHidden);
+    });
+  }
+
+  if (ui.closeInventoryModal) {
+    ui.closeInventoryModal.addEventListener("click", () => {
+      setInventoryModalOpen(false);
+    });
+  }
+
+  if (ui.inventoryModal) {
+    ui.inventoryModal.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.closest(".modal-card")) {
+        return;
+      }
+      setInventoryModalOpen(false);
+    });
+  }
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       setSettingsModalOpen(false);
       closeMinerPanels();
       closeResourceStatsPanel();
       setClassModalOpen(false);
+      setInventoryModalOpen(false);
     }
   });
 
@@ -227,6 +269,32 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.buyIronGeneration) ui.buyIronGeneration.addEventListener("click", buyIronGeneration);
   if (ui.buySilverGeneration) ui.buySilverGeneration.addEventListener("click", buySilverGeneration);
   if (ui.buyGoldGeneration) ui.buyGoldGeneration.addEventListener("click", buyGoldGeneration);
+  if (ui.sellAllResources) ui.sellAllResources.addEventListener("click", sellAllResources);
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const sellOneButton = target.closest(".resource-sell-btn") as HTMLButtonElement | null;
+    if (sellOneButton instanceof HTMLButtonElement) {
+      const ore = sellOneButton.dataset.ore;
+      if (ore === "sand" || ore === "coal" || ore === "copper" || ore === "iron" || ore === "silver" || ore === "gold") {
+        sellOneResource(ore);
+      }
+      return;
+    }
+
+    const sellAllByResourceButton = target.closest(".inventory-sell-all-btn") as HTMLButtonElement | null;
+    if (sellAllByResourceButton instanceof HTMLButtonElement) {
+      const ore = sellAllByResourceButton.dataset.ore;
+      if (ore === "sand" || ore === "coal" || ore === "copper" || ore === "iron" || ore === "silver" || ore === "gold") {
+        sellAllByResource(ore);
+      }
+      return;
+    }
+
+  });
   if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.addEventListener("click", buyDoubleActivationMin);
   if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.addEventListener("click", buyDoubleActivationMax);
   if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.addEventListener("click", buyVeinFinderUpgrade);

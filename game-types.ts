@@ -50,11 +50,14 @@ export interface ResourceConfig {
   resourceLevel: number;
 }
 
+export type ResourceInventory = Record<OreType, number>;
+
 export interface GameState {
   coins: number;
   idleMinerOwned: number;
   mapExpansions: number;
   resources: ResourceConfig[];
+  inventory: ResourceInventory;
   lastTick: number;
   lastRenderedMapSize: number;
   idleMinerCooldowns: number[];

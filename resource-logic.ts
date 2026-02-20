@@ -9,6 +9,21 @@ interface CreateResourceLogicArgs {
   getChanceText: (chancePercent: number) => string;
 }
 
+interface InventoryItemState {
+  confirmed: number;
+  pending: number;
+}
+
+interface ResourceLegendRowRefs {
+  name: HTMLElement;
+  chance: HTMLElement;
+  value: HTMLElement;
+  inventory: HTMLElement;
+  sellButton: HTMLButtonElement;
+}
+
+const INVENTORY_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
+
 export function createResourceLogic(args: CreateResourceLogicArgs): {
   getResourceByOre: (ore: OreType) => ResourceConfig;
   getOreGenerationLevel: (ore: UpgradableOre) => number;
@@ -19,11 +34,84 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
   rollTileType: () => OreType;
   rollTileTypeWithBoostedOre: (boostedOre: UpgradableOre, qualityMultiplier: number) => OreType;
   getTileCoinValue: (tileType: OreType) => number;
+  getInventoryAmount: (ore: OreType) => number;
+  addInventory: (ore: OreType, amount: number) => void;
+  sellInventory: (ore: OreType, amount: number) => number;
+  sellAllInventory: () => number;
+  flushInventory: () => boolean;
   getOreDisplayName: (ore: OreType) => string;
   renderResourceLegend: () => void;
   getOreGenerationStatText: (ore: UpgradableOre) => string;
 } {
   const { state, resourceLegendBody, getUpgradeCost, round, getChanceText } = args;
+
+  let inventorySource = state.inventory;
+  let resourceSource = state.resources;
+  let legendInitialized = false;
+
+  const legendDirtyOres = new Set<OreType>(INVENTORY_ORES);
+  const legendRowRefs: Partial<Record<OreType, ResourceLegendRowRefs>> = {};
+
+  function markLegendDirty(ore: OreType): void {
+    legendDirtyOres.add(ore);
+  }
+
+  function markAllLegendDirty(): void {
+    for (const ore of INVENTORY_ORES) {
+      legendDirtyOres.add(ore);
+    }
+  }
+
+  const inventoryItems: Record<OreType, InventoryItemState> = {
+    sand: { confirmed: Math.max(0, Math.floor(Number(inventorySource.sand) || 0)), pending: 0 },
+    coal: { confirmed: Math.max(0, Math.floor(Number(inventorySource.coal) || 0)), pending: 0 },
+    copper: { confirmed: Math.max(0, Math.floor(Number(inventorySource.copper) || 0)), pending: 0 },
+    iron: { confirmed: Math.max(0, Math.floor(Number(inventorySource.iron) || 0)), pending: 0 },
+    silver: { confirmed: Math.max(0, Math.floor(Number(inventorySource.silver) || 0)), pending: 0 },
+    gold: { confirmed: Math.max(0, Math.floor(Number(inventorySource.gold) || 0)), pending: 0 },
+  };
+
+  function ensureInventorySource(): void {
+    if (state.inventory === inventorySource) {
+      return;
+    }
+
+    inventorySource = state.inventory;
+    for (const ore of INVENTORY_ORES) {
+      inventoryItems[ore].confirmed = Math.max(0, Math.floor(Number(inventorySource[ore]) || 0));
+      inventoryItems[ore].pending = 0;
+    }
+    markAllLegendDirty();
+  }
+
+  function syncOreToState(ore: OreType): void {
+    inventorySource[ore] = inventoryItems[ore].confirmed;
+  }
+
+  function flushInventoryForOre(ore: OreType): boolean {
+    ensureInventorySource();
+    const item = inventoryItems[ore];
+    if (item.pending === 0) {
+      return false;
+    }
+
+    item.confirmed = Math.max(0, item.confirmed + item.pending);
+    item.pending = 0;
+    syncOreToState(ore);
+    markLegendDirty(ore);
+    return true;
+  }
+
+  function flushInventory(): boolean {
+    ensureInventorySource();
+    let changed = false;
+    for (const ore of INVENTORY_ORES) {
+      if (flushInventoryForOre(ore)) {
+        changed = true;
+      }
+    }
+    return changed;
+  }
 
   function getOreUpgradeConfig(ore: UpgradableOre): UpgradeConfig {
     const resource = state.resources.find((entry) => entry.ore === ore);
@@ -63,6 +151,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     const resource = state.resources.find((entry) => entry.ore === ore);
     if (resource) {
       resource.resourceLevel = Math.max(0, level);
+      markAllLegendDirty();
     }
   }
 
@@ -130,6 +219,46 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     return getResourceByOre(tileType).value || 1;
   }
 
+  function getInventoryAmount(ore: OreType): number {
+    ensureInventorySource();
+    const item = inventoryItems[ore];
+    return Math.max(0, item.confirmed + item.pending);
+  }
+
+  function addInventory(ore: OreType, amount: number): void {
+    ensureInventorySource();
+    if (amount <= 0) {
+      return;
+    }
+    inventoryItems[ore].pending += Math.floor(amount);
+    markLegendDirty(ore);
+  }
+
+  function sellInventory(ore: OreType, amount: number): number {
+    ensureInventorySource();
+    flushInventoryForOre(ore);
+    const owned = inventoryItems[ore].confirmed;
+    const toSell = Math.min(owned, Math.max(0, Math.floor(amount)));
+    if (toSell <= 0) {
+      return 0;
+    }
+
+    inventoryItems[ore].confirmed = owned - toSell;
+    syncOreToState(ore);
+    markLegendDirty(ore);
+    return toSell * getTileCoinValue(ore);
+  }
+
+  function sellAllInventory(): number {
+    ensureInventorySource();
+    flushInventory();
+    let totalCoins = 0;
+    for (const ore of INVENTORY_ORES) {
+      totalCoins += sellInventory(ore, inventoryItems[ore].confirmed);
+    }
+    return totalCoins;
+  }
+
   function getOreDisplayName(ore: OreType): string {
     return getResourceByOre(ore).name;
   }
@@ -139,16 +268,71 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
       return;
     }
 
-    const weights = state.resources.map((resource) => ({ ore: resource.ore, weight: getOreEffectiveWeight(resource.ore) }));
+    if (state.resources !== resourceSource) {
+      resourceSource = state.resources;
+      markAllLegendDirty();
+    }
+
+    if (!legendInitialized) {
+      resourceLegendBody.innerHTML = "";
+
+      for (const ore of INVENTORY_ORES) {
+        const row = document.createElement("p");
+        row.className = "resource-legend-row";
+
+        const nameNode = document.createElement("span");
+        const chanceNode = document.createElement("span");
+        const valueNode = document.createElement("span");
+        const inventoryNode = document.createElement("span");
+        const sellNode = document.createElement("span");
+        const sellButton = document.createElement("button");
+
+        sellButton.type = "button";
+        sellButton.className = "resource-sell-btn";
+        sellButton.dataset.ore = ore;
+        sellButton.textContent = "Sell 1";
+
+        sellNode.appendChild(sellButton);
+        row.append(nameNode, chanceNode, valueNode, inventoryNode, sellNode);
+        resourceLegendBody.appendChild(row);
+
+        legendRowRefs[ore] = {
+          name: nameNode,
+          chance: chanceNode,
+          value: valueNode,
+          inventory: inventoryNode,
+          sellButton,
+        };
+      }
+
+      legendInitialized = true;
+      markAllLegendDirty();
+    }
+
+    if (legendDirtyOres.size === 0) {
+      return;
+    }
+
+    const weights = INVENTORY_ORES.map((ore) => ({ ore, weight: getOreEffectiveWeight(ore) }));
     const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
 
-    resourceLegendBody.innerHTML = weights
-      .map(({ ore, weight }) => {
-        const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
-        const chanceText = getChanceText(chancePercent);
-        return `<p class="resource-legend-row"><span>${getOreDisplayName(ore)}</span><span>${chanceText}%</span><span>${getTileCoinValue(ore)}</span></p>`;
-      })
-      .join("");
+    for (const ore of legendDirtyOres) {
+      const refs = legendRowRefs[ore];
+      if (!refs) {
+        continue;
+      }
+
+      const weight = weights.find((entry) => entry.ore === ore)?.weight || 0;
+      const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
+
+      refs.name.textContent = getOreDisplayName(ore);
+      refs.chance.textContent = `${getChanceText(chancePercent)}%`;
+      refs.value.textContent = getTileCoinValue(ore).toString();
+      refs.inventory.textContent = getInventoryAmount(ore).toString();
+      refs.sellButton.dataset.ore = ore;
+    }
+
+    legendDirtyOres.clear();
   }
 
   function getOreGenerationStatText(ore: UpgradableOre): string {
@@ -171,6 +355,11 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     rollTileType,
     rollTileTypeWithBoostedOre,
     getTileCoinValue,
+    getInventoryAmount,
+    addInventory,
+    sellInventory,
+    sellAllInventory,
+    flushInventory,
     getOreDisplayName,
     renderResourceLegend,
     getOreGenerationStatText,

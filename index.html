@@ -21,6 +21,7 @@
             <span class="label">Per second</span>
             <strong id="per-second">0</strong>
           </div>
+          <button id="inventory-toggle" class="inventory-toggle-button">Inventory</button>
         </section>
       </header>
 
@@ -30,12 +31,17 @@
           <section id="resource-stats-panel" class="panel left-side-menu resource-stats-panel hidden" aria-label="Resource stats">
             <div class="miner-popup-header">
               <h3>Resource Stats</h3>
-              <button id="close-resource-stats" class="close-button" aria-label="Close resource stats">✕</button>
+              <div class="resource-stats-actions">
+                <button id="sell-all-resources" class="resource-sell-all">Sell All</button>
+                <button id="close-resource-stats" class="close-button" aria-label="Close resource stats">✕</button>
+              </div>
             </div>
             <div class="resource-legend-header">
               <span>Resource</span>
               <span>Chance</span>
               <span>Value</span>
+              <span>Inv</span>
+              <span>Sell</span>
             </div>
             <div id="resource-legend-body" class="resource-legend-body"></div>
           </section>
@@ -261,6 +267,28 @@
             <div class="upgrade-header"><span>⏩ Multi Activator</span></div>
             <small>Unlocks min/max extra activation range upgrades</small>
           </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="inventory-modal" class="modal hidden" aria-label="Inventory" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card inventory-modal-card">
+        <header class="modal-header">
+          <h2>Inventory</h2>
+          <div class="modal-actions">
+            <button id="close-inventory-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body">
+          <div class="inventory-header-row">
+            <span>Resource</span>
+            <span>Owned</span>
+            <span>Value</span>
+            <span>Total</span>
+            <span>Action</span>
+          </div>
+          <div id="inventory-list" class="inventory-list"></div>
         </div>
       </div>
     </section>

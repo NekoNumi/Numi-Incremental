@@ -9,6 +9,7 @@ import { runIdleMinersLoop } from "./game-loop";
 import type {
   GameState,
   MinerTargeting,
+  OreType,
   UnitSpecialization,
   UpgradeConfig,
 } from "./game-types";
@@ -16,9 +17,9 @@ import { clamp } from "./map-geometry";
 import { createMinerActions } from "./miner-actions";
 import { createMinerLogic } from "./miner-logic";
 import { clearSavedGame, loadGameState, saveGameState } from "./persistence";
-import { createDefaultResources } from "./resources";
+import { createDefaultResources, createEmptyInventory } from "./resources";
 import { createResourceLogic } from "./resource-logic";
-import { getChanceText, shouldRevealNextOre } from "./rendering";
+import { createRenderScheduler, getChanceText, shouldRevealNextOre } from "./rendering";
 import { createTileActions } from "./tile-actions";
 import { renderMinerPopupView, renderMinerStatsPanelView } from "./ui-miner-panels";
 import { createUiPanelControls } from "./ui-panel-controls";
@@ -53,6 +54,10 @@ interface UIElements {
   idleMinerOwned: HTMLElement | null;
   settingsToggle: HTMLElement | null;
   settingsModal: HTMLElement | null;
+  inventoryToggle: HTMLButtonElement | null;
+  inventoryModal: HTMLElement | null;
+  closeInventoryModal: HTMLButtonElement | null;
+  inventoryList: HTMLElement | null;
   upgradesAccordionBody: HTMLElement | null;
   toggleUpgradesAccordion: HTMLButtonElement | null;
   buyIdleMiner: HTMLButtonElement | null;
@@ -63,6 +68,7 @@ interface UIElements {
   resourceStatsPanel: HTMLElement | null;
   resourceStatsToggle: HTMLButtonElement | null;
   closeResourceStatsButton: HTMLButtonElement | null;
+  sellAllResources: HTMLButtonElement | null;
   resourceLegendBody: HTMLElement | null;
   mapGrid: HTMLElement | null;
   minerRing: HTMLElement | null;
@@ -156,6 +162,7 @@ const state: GameState = {
   idleMinerOwned: 0,
   mapExpansions: 0,
   resources: [],
+  inventory: createEmptyInventory(),
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
   idleMinerCooldowns: [],
@@ -177,6 +184,34 @@ const interactionState: InteractionState = {
   oreSilverRevealed: false,
   oreGoldRevealed: false,
 };
+
+let inventoryUiDirty = true;
+
+type InventoryOre = OreType;
+
+interface InventoryRowRefs {
+  name: HTMLElement;
+  amount: HTMLElement;
+  value: HTMLElement;
+  total: HTMLElement;
+  sellButton: HTMLButtonElement;
+}
+
+const INVENTORY_ORES: InventoryOre[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
+const inventoryDirtyOres = new Set<InventoryOre>(INVENTORY_ORES);
+const inventoryRowRefs: Partial<Record<InventoryOre, InventoryRowRefs>> = {};
+
+function markInventoryDirty(ore: InventoryOre): void {
+  inventoryDirtyOres.add(ore);
+  inventoryUiDirty = true;
+}
+
+function markAllInventoryDirty(): void {
+  for (const ore of INVENTORY_ORES) {
+    inventoryDirtyOres.add(ore);
+  }
+  inventoryUiDirty = true;
+}
 
 const idleMiner: UpgradeConfig = {
   baseCost: 10,
@@ -236,6 +271,10 @@ const ui: UIElements = {
   idleMinerOwned: document.getElementById("idle-miner-owned"),
   settingsToggle: document.getElementById("settings-toggle"),
   settingsModal: document.getElementById("settings-modal"),
+  inventoryToggle: document.getElementById("inventory-toggle") as HTMLButtonElement,
+  inventoryModal: document.getElementById("inventory-modal"),
+  closeInventoryModal: document.getElementById("close-inventory-modal") as HTMLButtonElement,
+  inventoryList: document.getElementById("inventory-list"),
   upgradesAccordionBody: document.getElementById("upgrades-accordion-body"),
   toggleUpgradesAccordion: document.getElementById("toggle-upgrades-accordion") as HTMLButtonElement,
   buyIdleMiner: document.getElementById("buy-idle-miner") as HTMLButtonElement,
@@ -246,6 +285,7 @@ const ui: UIElements = {
   resourceStatsPanel: document.getElementById("resource-stats-panel"),
   resourceStatsToggle: document.getElementById("resource-stats-toggle") as HTMLButtonElement,
   closeResourceStatsButton: document.getElementById("close-resource-stats") as HTMLButtonElement,
+  sellAllResources: document.getElementById("sell-all-resources") as HTMLButtonElement,
   resourceLegendBody: document.getElementById("resource-legend-body"),
   mapGrid: document.getElementById("map-grid"),
   minerRing: document.getElementById("miner-ring"),
@@ -363,6 +403,11 @@ const {
   rollTileType,
   rollTileTypeWithBoostedOre,
   getTileCoinValue,
+  getInventoryAmount,
+  addInventory,
+  sellInventory,
+  sellAllInventory,
+  flushInventory,
   renderResourceLegend,
   getOreGenerationStatText,
 } = createResourceLogic({
@@ -436,6 +481,8 @@ const {
   chainReactionUpgrade,
 });
 
+const requestRender = createRenderScheduler(() => renderNow());
+
 function selectMinerSpecialization(spec: Exclude<UnitSpecialization, "Worker">): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null || !canChooseSpecialization(minerIndex)) {
@@ -486,11 +533,122 @@ function setStatus(message: string): void {
   }, 1600);
 }
 
+function setInventoryModalOpen(isOpen: boolean): void {
+  if (!ui.inventoryModal || !ui.inventoryToggle) return;
+  ui.inventoryModal.classList.toggle("hidden", !isOpen);
+  ui.inventoryModal.setAttribute("aria-hidden", String(!isOpen));
+  ui.inventoryToggle.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) {
+    markAllInventoryDirty();
+    renderInventoryModal();
+  }
+}
+
+function renderInventoryModal(): void {
+  if (!ui.inventoryList) {
+    return;
+  }
+
+  if (!inventoryRowRefs.sand) {
+    ui.inventoryList.innerHTML = "";
+
+    for (const ore of INVENTORY_ORES) {
+      const row = document.createElement("p");
+      row.className = "inventory-row";
+
+      const nameNode = document.createElement("span");
+      const amountNode = document.createElement("span");
+      const valueNode = document.createElement("span");
+      const totalNode = document.createElement("span");
+      const actionNode = document.createElement("span");
+      const sellButton = document.createElement("button");
+
+      sellButton.type = "button";
+      sellButton.className = "inventory-sell-all-btn";
+      sellButton.dataset.ore = ore;
+      sellButton.textContent = "Sell All";
+
+      actionNode.appendChild(sellButton);
+      row.append(nameNode, amountNode, valueNode, totalNode, actionNode);
+      ui.inventoryList.appendChild(row);
+
+      inventoryRowRefs[ore] = {
+        name: nameNode,
+        amount: amountNode,
+        value: valueNode,
+        total: totalNode,
+        sellButton,
+      };
+    }
+    markAllInventoryDirty();
+  }
+
+  for (const ore of INVENTORY_ORES) {
+    if (!inventoryDirtyOres.has(ore)) {
+      continue;
+    }
+    const refs = inventoryRowRefs[ore];
+    if (!refs) {
+      continue;
+    }
+
+    const resource = state.resources.find((entry) => entry.ore === ore);
+    const name = resource?.name || ore;
+    const value = getTileCoinValue(ore);
+    const amount = getInventoryAmount(ore);
+    const total = value * amount;
+
+    refs.name.textContent = name;
+    refs.amount.textContent = amount.toLocaleString();
+    refs.value.textContent = value.toLocaleString();
+    refs.total.textContent = total.toLocaleString();
+  }
+
+  inventoryDirtyOres.clear();
+  inventoryUiDirty = false;
+}
+
+function sellOneResource(ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold"): void {
+  const soldCoins = sellInventory(ore, 1);
+  if (soldCoins <= 0) {
+    setStatus(`No ${ore} available to sell.`);
+    return;
+  }
+  state.coins += soldCoins;
+  markInventoryDirty(ore);
+  setStatus(`Sold 1 ${ore} for ${soldCoins.toLocaleString()} coins.`);
+  render();
+}
+
+function sellAllForResource(ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold"): void {
+  const soldCoins = sellInventory(ore, getInventoryAmount(ore));
+  if (soldCoins <= 0) {
+    setStatus(`No ${ore} available to sell.`);
+    return;
+  }
+  state.coins += soldCoins;
+  markInventoryDirty(ore);
+  setStatus(`Sold all ${ore} for ${soldCoins.toLocaleString()} coins.`);
+  render();
+}
+
+function sellAllResourcesAction(): void {
+  const soldCoins = sellAllInventory();
+  if (soldCoins <= 0) {
+    return;
+  }
+  state.coins += soldCoins;
+  markAllInventoryDirty();
+  setStatus(`Sold inventory for ${soldCoins.toLocaleString()} coins.`);
+  render();
+}
+
 function canAfford(cost: number): boolean {
   return state.coins >= cost;
 }
 
 function saveGame(showStatus: boolean = true): void {
+  flushInventory();
   saveGameState(SAVE_KEY, state);
 
   if (showStatus) {
@@ -581,10 +739,10 @@ const {
 
 const { applyTileType, activateTile, triggerChainReaction } = createTileActions({
   mapGrid: ui.mapGrid,
-  addCoins: (amount) => {
-    state.coins += amount;
+  addInventory: (ore, amount) => {
+    addInventory(ore, amount);
+    markInventoryDirty(ore);
   },
-  getTileCoinValue,
   getCritChance,
   getCritMultiplier,
   getVeinFinderQualityMultiplier,
@@ -636,6 +794,7 @@ const {
   saveKey: SAVE_KEY,
   clearSavedGame,
   createDefaultResources,
+  createEmptyInventory,
   canAfford,
   getIdleMinerCost,
   getMapExpansionCost,
@@ -901,7 +1060,11 @@ function runIdleMiners(deltaSeconds: number): void {
   });
 }
 
-function render(): void {
+function renderNow(): void {
+  if (flushInventory()) {
+    markAllInventoryDirty();
+  }
+
   syncIdleMinerState();
 
   const cps = getCoinsPerSecond();
@@ -912,6 +1075,13 @@ function render(): void {
   const ironCost = getOreGenerationCost("iron");
   const silverCost = getOreGenerationCost("silver");
   const goldCost = getOreGenerationCost("gold");
+  const totalInventory =
+    getInventoryAmount("sand") +
+    getInventoryAmount("coal") +
+    getInventoryAmount("copper") +
+    getInventoryAmount("iron") +
+    getInventoryAmount("silver") +
+    getInventoryAmount("gold");
   const mapSize = getMapSize();
 
   if (!interactionState.oreCopperRevealed && shouldRevealNextOre(getOreGenerationLevel("coal"), state.coins, copperCost)) {
@@ -960,14 +1130,23 @@ function render(): void {
   if (ui.goldGenerationLevel) ui.goldGenerationLevel.textContent = getOreGenerationLevel("gold").toString();
   if (ui.goldGenerationStat) ui.goldGenerationStat.textContent = getOreGenerationStatText("gold");
   if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost);
+  if (ui.sellAllResources) ui.sellAllResources.disabled = totalInventory <= 0;
 
   renderMap();
   renderUpgradesAccordion();
   renderResourceStatsPanel();
   renderResourceLegend();
+  const isInventoryModalOpen = !!ui.inventoryModal && !ui.inventoryModal.classList.contains("hidden");
+  if (isInventoryModalOpen && (inventoryUiDirty || inventoryDirtyOres.size > 0)) {
+    renderInventoryModal();
+  }
   renderMinerRing();
   renderMinerStatsPanel();
   renderMinerPopup();
+}
+
+function render(): void {
+  requestRender();
 }
 
 function gameLoop(): void {
@@ -986,6 +1165,7 @@ bindUiEvents({
   closeMinerPanels,
   closeResourceStatsPanel,
   setClassModalOpen,
+  setInventoryModalOpen,
   activateTile: (tile) => {
     activateTile(tile);
   },
@@ -1006,6 +1186,9 @@ bindUiEvents({
   buyIronGeneration,
   buySilverGeneration,
   buyGoldGeneration,
+  sellOneResource,
+  sellAllByResource: sellAllForResource,
+  sellAllResources: sellAllResourcesAction,
   buyDoubleActivationMin,
   buyDoubleActivationMax,
   buyVeinFinderUpgrade,
@@ -1021,7 +1204,7 @@ bindUiEvents({
 
 loadGame();
 state.lastTick = Date.now();
-render();
+renderNow();
 
 setInterval(gameLoop, 100);
 setInterval(() => saveGame(false), 10000);

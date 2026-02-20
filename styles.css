@@ -67,6 +67,11 @@ h3 {
   min-width: 320px;
 }
 
+.inventory-toggle-button {
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
 .label {
   display: block;
   opacity: 0.75;
@@ -151,6 +156,38 @@ strong {
   padding: 0;
 }
 
+.inventory-modal-card {
+  max-width: 620px;
+  min-height: auto;
+}
+
+.inventory-header-row,
+.inventory-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.7fr 0.7fr 0.8fr 0.9fr;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.inventory-header-row {
+  opacity: 0.75;
+  border-bottom: 1px solid rgb(156 181 235 / 20%);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.inventory-list {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.inventory-sell-all-btn {
+  padding: 0.2rem 0.35rem;
+  border-radius: 7px;
+  font-size: 0.68rem;
+}
+
 .modal-header {
   display: grid;
   gap: 0.8rem;
@@ -231,10 +268,32 @@ strong {
 .resource-legend-header,
 .resource-legend-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.8fr;
+  grid-template-columns: 1.2fr 1fr 0.8fr 0.6fr 0.9fr;
   gap: 0.45rem;
   font-size: 0.78rem;
   align-items: center;
+}
+
+.resource-stats-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.resource-sell-all {
+  padding: 0.25rem 0.45rem;
+  border-radius: 7px;
+  font-size: 0.72rem;
+}
+
+.resource-sell-btn {
+  padding: 0.2rem 0.35rem;
+  border-radius: 7px;
+  font-size: 0.68rem;
+}
+
+.resource-sell-placeholder {
+  opacity: 0.55;
 }
 
 .resource-legend-header {

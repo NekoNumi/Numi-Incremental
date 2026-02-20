@@ -5,6 +5,7 @@ interface CreateGameActionsArgs {
   saveKey: string;
   clearSavedGame: (saveKey: string) => void;
   createDefaultResources: () => GameState["resources"];
+  createEmptyInventory: () => GameState["inventory"];
   canAfford: (cost: number) => boolean;
   getIdleMinerCost: () => number;
   getMapExpansionCost: () => number;
@@ -33,6 +34,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
     saveKey,
     clearSavedGame,
     createDefaultResources,
+    createEmptyInventory,
     canAfford,
     getIdleMinerCost,
     getMapExpansionCost,
@@ -63,6 +65,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
     state.idleMinerOwned = 0;
     state.mapExpansions = 0;
     state.resources = createDefaultResources();
+    state.inventory = createEmptyInventory();
     state.lastTick = Date.now();
     state.lastRenderedMapSize = 0;
     state.idleMinerCooldowns = [];
