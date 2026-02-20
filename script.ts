@@ -35,6 +35,7 @@ interface GameState {
   coins: number;
   idleMinerOwned: number;
   mapExpansions: number;
+  coalGenerationLevel: number;
   lastTick: number;
   lastRenderedMapSize: number;
   idleMinerCooldowns: number[];
@@ -76,6 +77,9 @@ interface UIElements {
   popupSpeedLevel: HTMLElement | null;
   popupRadiusLevel: HTMLElement | null;
   popupReposition: HTMLButtonElement | null;
+  coalGenerationCost: HTMLElement | null;
+  coalGenerationLevel: HTMLElement | null;
+  buyCoalGeneration: HTMLButtonElement | null;
 }
 
 // State
@@ -83,6 +87,7 @@ const state: GameState = {
   coins: 0,
   idleMinerOwned: 0,
   mapExpansions: 0,
+  coalGenerationLevel: 0,
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
   idleMinerCooldowns: [],
@@ -115,6 +120,12 @@ const minerRadiusUpgrade: UpgradeConfig = {
   areaMultiplierPerLevel: 1.2,
 };
 
+const coalGenerationUpgrade: UpgradeConfig = {
+  baseCost: 75,
+  growth: 1.25,
+  bonusClicksPerSecond: 0.05,
+};
+
 // UI Element references
 const ui: UIElements = {
   coins: document.getElementById("coins"),
@@ -143,6 +154,9 @@ const ui: UIElements = {
   popupSpeedLevel: document.getElementById("popup-speed-level"),
   popupRadiusLevel: document.getElementById("popup-radius-level"),
   popupReposition: document.getElementById("popup-reposition") as HTMLButtonElement,
+  coalGenerationCost: document.getElementById("coal-generation-cost"),
+  coalGenerationLevel: document.getElementById("coal-generation-level"),
+  buyCoalGeneration: document.getElementById("buy-coal-generation") as HTMLButtonElement,
 };
 
 // Utility functions
@@ -215,6 +229,14 @@ function getMinerEffectRadiusPx(minerIndex: number): number {
   return BASE_MINER_EFFECT_RADIUS_PX * Math.sqrt(areaMultiplier);
 }
 
+function getCoalGenerationCost(): number {
+  return getUpgradeCost(coalGenerationUpgrade, state.coalGenerationLevel);
+}
+
+function getCoalSpawnChance(): number {
+  return 0.05 * (1 + state.coalGenerationLevel * 0.5);
+}
+
 function getCoinsPerSecond(): number {
   let total = 0;
   for (let minerIndex = 0; minerIndex < state.idleMinerOwned; minerIndex += 1) {
@@ -254,6 +276,7 @@ function saveGame(showStatus: boolean = true): void {
       idleMinerPositions: state.idleMinerPositions,
       idleMinerUpgrades: state.idleMinerUpgrades,
       mapExpansions: state.mapExpansions,
+      coalGenerationLevel: state.coalGenerationLevel,
       savedAt: Date.now(),
     })
   );
@@ -344,6 +367,7 @@ function loadGame(): void {
     }
 
     state.mapExpansions = Number(parsed.mapExpansions) || 0;
+    state.coalGenerationLevel = Number(parsed.coalGenerationLevel) || 0;
     syncIdleMinerState();
 
     const now = Date.now();
@@ -456,10 +480,23 @@ function activateTile(tile: HTMLElement, shouldRender: boolean = true): boolean 
     return false;
   }
 
-  state.coins += 1;
+  const isCoal = tile.dataset.tileType === "coal";
+  state.coins += isCoal ? 3 : 1;
+  
   tile.classList.add("map-tile--cooldown");
+  tile.dataset.tileType = "";
+  tile.classList.remove("map-tile--coal");
+  
   setTimeout(() => {
     tile.classList.remove("map-tile--cooldown");
+    // Regenerate tile type when cooldown ends
+    if (Math.random() < getCoalSpawnChance()) {
+      tile.dataset.tileType = "coal";
+      tile.classList.add("map-tile--coal");
+    } else {
+      tile.dataset.tileType = "sand";
+      tile.classList.remove("map-tile--coal");
+    }
   }, 1000);
 
   if (shouldRender) {
@@ -535,6 +572,7 @@ function resetGame(): void {
   state.coins = 0;
   state.idleMinerOwned = 0;
   state.mapExpansions = 0;
+  state.coalGenerationLevel = 0;
   state.lastTick = Date.now();
   state.lastRenderedMapSize = 0;
   state.idleMinerCooldowns = [];
@@ -556,6 +594,16 @@ function buyMapExpansion(): void {
   render();
 }
 
+function buyCoalGeneration(): void {
+  const cost = getCoalGenerationCost();
+  if (!canAfford(cost)) {
+    return;
+  }
+  state.coins -= cost;
+  state.coalGenerationLevel += 1;
+  render();
+}
+
 function renderMap(): void {
   if (!ui.mapGrid) return;
   const mapSize = getMapSize();
@@ -571,7 +619,15 @@ function renderMap(): void {
     const tile = document.createElement("div");
     tile.className = "map-tile";
     tile.dataset.tileIndex = index.toString();
-    tile.setAttribute("aria-label", "Sandy tile");
+    
+    // Randomly assign coal or sand type
+    const isCoal = Math.random() < getCoalSpawnChance();
+    tile.dataset.tileType = isCoal ? "coal" : "sand";
+    if (isCoal) {
+      tile.classList.add("map-tile--coal");
+    }
+    
+    tile.setAttribute("aria-label", isCoal ? "Coal tile" : "Sandy tile");
     ui.mapGrid.appendChild(tile);
   }
 
@@ -703,6 +759,7 @@ function render(): void {
   const cps = getCoinsPerSecond();
   const idleMinerCost = getIdleMinerCost();
   const mapCost = getMapExpansionCost();
+  const coalCost = getCoalGenerationCost();
   const mapSize = getMapSize();
 
   if (ui.coins) ui.coins.textContent = format(state.coins);
@@ -714,6 +771,9 @@ function render(): void {
   if (ui.mapExpansions) ui.mapExpansions.textContent = state.mapExpansions.toString();
   if (ui.mapSize) ui.mapSize.textContent = `${mapSize}x${mapSize}`;
   if (ui.expandMap) ui.expandMap.disabled = !canAfford(mapCost);
+  if (ui.coalGenerationCost) ui.coalGenerationCost.textContent = coalCost.toLocaleString();
+  if (ui.coalGenerationLevel) ui.coalGenerationLevel.textContent = state.coalGenerationLevel.toString();
+  if (ui.buyCoalGeneration) ui.buyCoalGeneration.disabled = !canAfford(coalCost);
 
   renderMap();
   renderMinerRing();
@@ -852,6 +912,9 @@ if (ui.buyIdleMiner) {
 }
 if (ui.expandMap) {
   ui.expandMap.addEventListener("click", buyMapExpansion);
+}
+if (ui.buyCoalGeneration) {
+  ui.buyCoalGeneration.addEventListener("click", buyCoalGeneration);
 }
 if (ui.save) {
   ui.save.addEventListener("click", () => saveGame(true));
