@@ -98,6 +98,8 @@ strong {
   grid-column: 2;
   display: grid;
   gap: 0.75rem;
+  position: relative;
+  overflow: visible;
 }
 
 .upgrades-header {
@@ -259,13 +261,17 @@ strong {
 }
 
 .miner-popup {
-  position: static;
-  width: 100%;
+  position: absolute;
+  left: calc(100% + 1rem);
+  top: 0;
+  width: 300px;
+  background: #1b2233;
+  border: 1px solid #2b3550;
+  border-radius: 12px;
+  padding: 0.85rem;
   display: grid;
   gap: 0.55rem;
-  margin-top: 1.2rem;
-  padding-top: 1.2rem;
-  border-top: 1px solid rgb(156 181 235 / 20%);
+  z-index: 12;
 }
 
 .miner-popup.hidden {
@@ -501,6 +507,14 @@ button:disabled {
 
   .upgrades {
     grid-column: 1;
+  }
+
+  .miner-popup {
+    position: static;
+    width: 100%;
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid rgb(156 181 235 / 20%);
   }
 
   .miner-stats-panel {

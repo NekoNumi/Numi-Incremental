@@ -11,6 +11,7 @@ interface MinerUpgrade {
   radiusLevel: number;
   doubleActivationMinLevel: number;
   doubleActivationMaxLevel: number;
+  veinFinderLevel: number;
 }
 
 interface Position {
@@ -127,6 +128,10 @@ interface UIElements {
   popupDoubleActivationMaxCost: HTMLElement | null;
   popupDoubleActivationMaxLevel: HTMLElement | null;
   popupDoubleActivationMaxStat: HTMLElement | null;
+  popupUpgradeVeinFinder: HTMLButtonElement | null;
+  popupVeinFinderCost: HTMLElement | null;
+  popupVeinFinderLevel: HTMLElement | null;
+  popupVeinFinderStat: HTMLElement | null;
   minerStatsPanel: HTMLElement | null;
   minerStatsTitle: HTMLElement | null;
   closeMinerStatsButton: HTMLButtonElement | null;
@@ -240,6 +245,11 @@ const doubleActivationMaxUpgrade: UpgradeConfig = {
   growth: 1.3,
 };
 
+const veinFinderUpgrade: UpgradeConfig = {
+  baseCost: 320,
+  growth: 1.5,
+};
+
 // UI Element references
 const ui: UIElements = {
   coins: document.getElementById("coins"),
@@ -305,6 +315,10 @@ const ui: UIElements = {
   popupDoubleActivationMaxCost: document.getElementById("popup-double-activation-max-cost"),
   popupDoubleActivationMaxLevel: document.getElementById("popup-double-activation-max-level"),
   popupDoubleActivationMaxStat: document.getElementById("popup-double-activation-max-stat"),
+  popupUpgradeVeinFinder: document.getElementById("popup-upgrade-vein-finder") as HTMLButtonElement,
+  popupVeinFinderCost: document.getElementById("popup-vein-finder-cost"),
+  popupVeinFinderLevel: document.getElementById("popup-vein-finder-level"),
+  popupVeinFinderStat: document.getElementById("popup-vein-finder-stat"),
   minerStatsPanel: document.getElementById("miner-stats-panel"),
   minerStatsTitle: document.getElementById("miner-stats-title"),
   closeMinerStatsButton: document.getElementById("close-miner-stats") as HTMLButtonElement,
@@ -347,13 +361,14 @@ function getIdleMinerCost(): number {
 function getMinerUpgrade(minerIndex: number): MinerUpgrade {
   const upgrade = state.idleMinerUpgrades[minerIndex];
   if (!upgrade) {
-    return { speedLevel: 0, radiusLevel: 0, doubleActivationMinLevel: 0, doubleActivationMaxLevel: 0 };
+    return { speedLevel: 0, radiusLevel: 0, doubleActivationMinLevel: 0, doubleActivationMaxLevel: 0, veinFinderLevel: 0 };
   }
   return {
     speedLevel: Number(upgrade.speedLevel) || 0,
     radiusLevel: Number(upgrade.radiusLevel) || 0,
     doubleActivationMinLevel: Number(upgrade.doubleActivationMinLevel) || 0,
     doubleActivationMaxLevel: Number(upgrade.doubleActivationMaxLevel) || 0,
+    veinFinderLevel: Number(upgrade.veinFinderLevel) || 0,
   };
 }
 
@@ -482,6 +497,36 @@ function rollTileType(): OreType {
   return "sand";
 }
 
+function rollTileTypeWithBoostedOre(boostedOre: UpgradableOre, qualityMultiplier: number): OreType {
+  const weights: Array<{ ore: OreType; weight: number }> = [
+    { ore: "sand", weight: getOreEffectiveWeight("sand") },
+    { ore: "coal", weight: getOreEffectiveWeight("coal") },
+    { ore: "copper", weight: getOreEffectiveWeight("copper") },
+    { ore: "iron", weight: getOreEffectiveWeight("iron") },
+    { ore: "silver", weight: getOreEffectiveWeight("silver") },
+    { ore: "gold", weight: getOreEffectiveWeight("gold") },
+  ];
+
+  for (const entry of weights) {
+    if (entry.ore === boostedOre) {
+      entry.weight *= qualityMultiplier;
+      break;
+    }
+  }
+
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * totalWeight;
+
+  for (const entry of weights) {
+    roll -= entry.weight;
+    if (roll <= 0) {
+      return entry.ore;
+    }
+  }
+
+  return "sand";
+}
+
 function getTileCoinValue(tileType: OreType): number {
   return ORE_REWARDS[tileType] || 1;
 }
@@ -515,12 +560,16 @@ function getDoubleActivationMaxCost(minerIndex: number): number {
   return getUpgradeCost(doubleActivationMaxUpgrade, getMinerUpgrade(minerIndex).doubleActivationMaxLevel);
 }
 
+function getVeinFinderCost(minerIndex: number): number {
+  return getUpgradeCost(veinFinderUpgrade, getMinerUpgrade(minerIndex).veinFinderLevel);
+}
+
 function getDoubleActivationMinPercent(minerIndex: number): number {
-  return getMinerUpgrade(minerIndex).doubleActivationMinLevel * 0.05;
+  return getMinerUpgrade(minerIndex).doubleActivationMinLevel * 0.1;
 }
 
 function getDoubleActivationMaxPercent(minerIndex: number): number {
-  return getMinerUpgrade(minerIndex).doubleActivationMaxLevel * 0.1;
+  return getMinerUpgrade(minerIndex).doubleActivationMaxLevel * 0.2;
 }
 
 function rollDoubleActivation(minerIndex: number): number {
@@ -576,16 +625,27 @@ function getMinerRadiusStatText(minerIndex: number): string {
 
 function getDoubleActivationMinStatText(minerIndex: number): string {
   const level = getMinerUpgrade(minerIndex).doubleActivationMinLevel;
-  const current = (level * 0.05 * 100).toFixed(0);
-  const next = ((level + 1) * 0.05 * 100).toFixed(0);
+  const current = (level * 0.1 * 100).toFixed(0);
+  const next = ((level + 1) * 0.1 * 100).toFixed(0);
   return `Current min: ${current}% → Upgrading to: ${next}%`;
 }
 
 function getDoubleActivationMaxStatText(minerIndex: number): string {
   const level = getMinerUpgrade(minerIndex).doubleActivationMaxLevel;
-  const current = (level * 0.1 * 100).toFixed(0);
-  const next = ((level + 1) * 0.1 * 100).toFixed(0);
+  const current = (level * 0.2 * 100).toFixed(0);
+  const next = ((level + 1) * 0.2 * 100).toFixed(0);
   return `Current max: ${current}% → Upgrading to: ${next}%`;
+}
+
+function getVeinFinderQualityMultiplier(minerIndex: number): number {
+  return 1 + getMinerUpgrade(minerIndex).veinFinderLevel * 0.25;
+}
+
+function getVeinFinderStatText(minerIndex: number): string {
+  const level = getMinerUpgrade(minerIndex).veinFinderLevel;
+  const currentBoost = (getVeinFinderQualityMultiplier(minerIndex) - 1) * 100;
+  const nextBoost = (1 + (level + 1) * 0.25 - 1) * 100;
+  return `Current boost: +${currentBoost.toFixed(0)}% → Upgrading to: +${nextBoost.toFixed(0)}% for mined ore respawn weight`;
 }
 
 function getCoinsPerSecond(): number {
@@ -658,7 +718,7 @@ function syncIdleMinerState(): void {
   }
 
   while (state.idleMinerUpgrades.length < state.idleMinerOwned) {
-    state.idleMinerUpgrades.push({ speedLevel: 0, radiusLevel: 0, doubleActivationMinLevel: 0, doubleActivationMaxLevel: 0 });
+    state.idleMinerUpgrades.push({ speedLevel: 0, radiusLevel: 0, doubleActivationMinLevel: 0, doubleActivationMaxLevel: 0, veinFinderLevel: 0 });
   }
   if (state.idleMinerUpgrades.length > state.idleMinerOwned) {
     state.idleMinerUpgrades.length = state.idleMinerOwned;
@@ -712,6 +772,7 @@ function loadGame(): void {
               radiusLevel: Number(u?.radiusLevel) || 0,
               doubleActivationMinLevel: Number(u?.doubleActivationMinLevel) || 0,
               doubleActivationMaxLevel: Number(u?.doubleActivationMaxLevel) || 0,
+              veinFinderLevel: Number(u?.veinFinderLevel) || 0,
             };
           })
           .filter((upgrade) => upgrade.speedLevel >= 0 && upgrade.radiusLevel >= 0)
@@ -724,6 +785,7 @@ function loadGame(): void {
           radiusLevel: legacyRadiusLevel,
           doubleActivationMinLevel: 0,
           doubleActivationMaxLevel: 0,
+          veinFinderLevel: 0,
         });
       }
     }
@@ -945,7 +1007,7 @@ function applyTileType(tile: HTMLElement, tileType: OreType): void {
   tile.setAttribute("aria-label", getTileAriaLabel(tileType));
 }
 
-function activateTile(tile: HTMLElement, shouldRender: boolean = true): boolean {
+function activateTile(tile: HTMLElement, shouldRender: boolean = true, minerIndex: number | null = null): boolean {
   if (!(tile instanceof HTMLElement) || tile.classList.contains("map-tile--cooldown")) {
     return false;
   }
@@ -956,10 +1018,17 @@ function activateTile(tile: HTMLElement, shouldRender: boolean = true): boolean 
   tile.classList.add("map-tile--cooldown");
   tile.dataset.tileType = "sand";
   clearTileOreClasses(tile);
+
+  const minedOre = tileType === "sand" ? null : (tileType as UpgradableOre);
+  const qualityMultiplier = minerIndex === null ? 1 : getVeinFinderQualityMultiplier(minerIndex);
   
   setTimeout(() => {
     tile.classList.remove("map-tile--cooldown");
-    applyTileType(tile, rollTileType());
+    if (minedOre && qualityMultiplier > 1) {
+      applyTileType(tile, rollTileTypeWithBoostedOre(minedOre, qualityMultiplier));
+    } else {
+      applyTileType(tile, rollTileType());
+    }
   }, 1000);
 
   if (shouldRender) {
@@ -1115,6 +1184,18 @@ function buyDoubleActivationMax(): void {
   render();
 }
 
+function buyVeinFinderUpgrade(): void {
+  const minerIndex = interactionState.selectedMinerIndex;
+  if (minerIndex === null) return;
+  const cost = getVeinFinderCost(minerIndex);
+  if (!canAfford(cost)) {
+    return;
+  }
+  state.coins -= cost;
+  state.idleMinerUpgrades[minerIndex].veinFinderLevel += 1;
+  render();
+}
+
 function renderMap(): void {
   if (!ui.mapGrid) return;
   const mapSize = getMapSize();
@@ -1199,6 +1280,7 @@ function renderMinerPopup(): void {
   const radiusCost = getMinerRadiusUpgradeCost(minerIndex);
   const doubleActivationMinCost = getDoubleActivationMinCost(minerIndex);
   const doubleActivationMaxCost = getDoubleActivationMaxCost(minerIndex);
+  const veinFinderCost = getVeinFinderCost(minerIndex);
 
   ui.minerPopup.classList.remove("hidden");
   if (ui.minerPopupTitle) ui.minerPopupTitle.textContent = `Miner ${minerIndex + 1}`;
@@ -1206,18 +1288,22 @@ function renderMinerPopup(): void {
   if (ui.popupRadiusLevel) ui.popupRadiusLevel.textContent = upgrade.radiusLevel.toString();
   if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = upgrade.doubleActivationMinLevel.toString();
   if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = upgrade.doubleActivationMaxLevel.toString();
+  if (ui.popupVeinFinderLevel) ui.popupVeinFinderLevel.textContent = upgrade.veinFinderLevel.toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = radiusCost.toLocaleString();
   if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = doubleActivationMinCost.toLocaleString();
   if (ui.popupDoubleActivationMaxCost) ui.popupDoubleActivationMaxCost.textContent = doubleActivationMaxCost.toLocaleString();
+  if (ui.popupVeinFinderCost) ui.popupVeinFinderCost.textContent = veinFinderCost.toLocaleString();
   if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = getMinerSpeedStatText(minerIndex);
   if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = getMinerRadiusStatText(minerIndex);
   if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = getDoubleActivationMinStatText(minerIndex);
   if (ui.popupDoubleActivationMaxStat) ui.popupDoubleActivationMaxStat.textContent = getDoubleActivationMaxStatText(minerIndex);
+  if (ui.popupVeinFinderStat) ui.popupVeinFinderStat.textContent = getVeinFinderStatText(minerIndex);
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !canAfford(speedCost);
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !canAfford(radiusCost);
   if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !canAfford(doubleActivationMinCost);
   if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.disabled = !canAfford(doubleActivationMaxCost);
+  if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.disabled = !canAfford(veinFinderCost);
   if (ui.popupReposition) ui.popupReposition.textContent = interactionState.placementMode ? "Click map to place…" : "Reposition";
 }
 
@@ -1285,7 +1371,7 @@ function runIdleMiners(deltaSeconds: number): void {
 
       const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
       const tile = eligibleTiles[randomIndex];
-      if (activateTile(tile, false)) {
+      if (activateTile(tile, false, minerIndex)) {
         activations += 1;
 
         // Double activation: always roll within min/max range
@@ -1301,7 +1387,7 @@ function runIdleMiners(deltaSeconds: number): void {
           );
           if (bonusTiles.length > 0) {
             const randomBonusIndex = Math.floor(Math.random() * bonusTiles.length);
-            if (activateTile(bonusTiles[randomBonusIndex], false)) {
+            if (activateTile(bonusTiles[randomBonusIndex], false, minerIndex)) {
               activations += 1;
             }
           }
@@ -1534,6 +1620,9 @@ if (ui.popupUpgradeDoubleActivationMin) {
 }
 if (ui.popupUpgradeDoubleActivationMax) {
   ui.popupUpgradeDoubleActivationMax.addEventListener("click", buyDoubleActivationMax);
+}
+if (ui.popupUpgradeVeinFinder) {
+  ui.popupUpgradeVeinFinder.addEventListener("click", buyVeinFinderUpgrade);
 }
 if (ui.save) {
   ui.save.addEventListener("click", () => saveGame(true));
