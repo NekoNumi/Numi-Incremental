@@ -351,7 +351,7 @@ function loadGame(): void {
     const secondsAway = Math.min((now - savedAt) / 1000, 8 * 60 * 60);
     state.coins += getCoinsPerSecond() * secondsAway;
 
-    setStatus(`Welcome back! Earned ${format(getCoinsPerSecond() * secondsAway)} while away.`);
+    setStatus(`Welcome back! Earned ${round(getCoinsPerSecond() * secondsAway, 0).toLocaleString()} while away.`);
   } catch {
     setStatus("Save data was invalid and has been ignored.");
   }
