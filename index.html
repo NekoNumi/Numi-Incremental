@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Numi's Idle</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <button id="settings-toggle" class="icon-button settings-cog" aria-label="Open settings" aria-expanded="false">⚙</button>
+
+    <main class="app">
+      <header class="topbar">
+        <h1>Numi's Idle</h1>
+        <section class="panel stats" aria-label="Stats">
+          <div>
+            <span class="label">Coins</span>
+            <strong id="coins">0</strong>
+          </div>
+          <div>
+            <span class="label">Per second</span>
+            <strong id="per-second">0</strong>
+          </div>
+        </section>
+      </header>
+
+      <section class="content-layout">
+        <section class="panel map" aria-label="Map">
+          <h2>Map</h2>
+          <p class="map-meta">Size: <strong id="map-size">1x1</strong></p>
+          <div id="map-environment" class="map-environment">
+            <div id="miner-ring" class="miner-ring" aria-label="Idle miners and cooldowns"></div>
+            <div id="map-grid" class="map-grid" role="button" aria-label="Sandy map, click tiles to gather coins"></div>
+          </div>
+        </section>
+
+        <section class="panel upgrades" aria-label="Upgrades">
+          <h2>Upgrades</h2>
+          <button id="buy-idle-miner" class="upgrade">
+            <span>Idle Miner</span>
+            <small>Activates 1 random tile every 5s • Cost: <span id="idle-miner-cost">10</span></small>
+            <strong>Owned: <span id="idle-miner-owned">0</span></strong>
+          </button>
+
+          <button id="expand-map" class="upgrade">
+            <span>Expand Map</span>
+            <small>Increase map dimensions by 1 • Cost: <span id="map-expand-cost">10</span></small>
+            <strong>Expansions: <span id="map-expansions">0</span></strong>
+          </button>
+
+          <section id="miner-popup" class="miner-popup hidden" aria-label="Miner options">
+            <h3 id="miner-popup-title">Miner</h3>
+            <button id="popup-upgrade-speed" class="upgrade">
+              <span>Faster Miner</span>
+              <small>+0.1 activations/sec • Cost: <span id="popup-speed-cost">0</span></small>
+              <strong>Level: <span id="popup-speed-level">0</span></strong>
+            </button>
+            <button id="popup-upgrade-radius" class="upgrade">
+              <span>Wider Mining Radius</span>
+              <small>+20% mining area • Cost: <span id="popup-radius-cost">0</span></small>
+              <strong>Level: <span id="popup-radius-level">0</span></strong>
+            </button>
+            <button id="popup-reposition">Reposition</button>
+          </section>
+        </section>
+      </section>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </main>
+
+    <section id="settings-modal" class="modal hidden" aria-label="Settings" aria-hidden="true">
+      <div id="settings-backdrop" class="modal-backdrop"></div>
+      <div class="panel modal-card">
+        <header class="modal-header">
+          <h2>Settings</h2>
+          <div class="modal-actions">
+            <button id="save">Save</button>
+            <button id="reset" class="danger">Reset</button>
+          </div>
+        </header>
+        <div class="modal-body"></div>
+      </div>
+    </section>
+
+    <script src="script.js"></script>
+  </body>
+</html>
