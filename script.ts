@@ -38,12 +38,19 @@ interface GameState {
   idleMinerOwned: number;
   mapExpansions: number;
   coalGenerationLevel: number;
+  copperGenerationLevel: number;
+  ironGenerationLevel: number;
+  silverGenerationLevel: number;
+  goldGenerationLevel: number;
   lastTick: number;
   lastRenderedMapSize: number;
   idleMinerCooldowns: number[];
   idleMinerPositions: (Position | null)[];
   idleMinerUpgrades: MinerUpgrade[];
 }
+
+type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold";
+type UpgradableOre = Exclude<OreType, "sand">;
 
 interface InteractionState {
   activeMinerIndex: number | null;
@@ -52,6 +59,7 @@ interface InteractionState {
   placementMode: boolean;
   upgradePanelOpen: boolean;
   statsPanelOpen: boolean;
+  resourceStatsOpen: boolean;
 }
 
 interface UIElements {
@@ -66,6 +74,10 @@ interface UIElements {
   reset: HTMLButtonElement | null;
   mapEnvironment: HTMLElement | null;
   mapSize: HTMLElement | null;
+  resourceStatsPanel: HTMLElement | null;
+  resourceStatsToggle: HTMLButtonElement | null;
+  closeResourceStatsButton: HTMLButtonElement | null;
+  resourceLegendBody: HTMLElement | null;
   mapGrid: HTMLElement | null;
   minerRing: HTMLElement | null;
   mapExpandCost: HTMLElement | null;
@@ -85,6 +97,22 @@ interface UIElements {
   coalGenerationLevel: HTMLElement | null;
   coalGenerationStat: HTMLElement | null;
   buyCoalGeneration: HTMLButtonElement | null;
+  copperGenerationCost: HTMLElement | null;
+  copperGenerationLevel: HTMLElement | null;
+  copperGenerationStat: HTMLElement | null;
+  buyCopperGeneration: HTMLButtonElement | null;
+  ironGenerationCost: HTMLElement | null;
+  ironGenerationLevel: HTMLElement | null;
+  ironGenerationStat: HTMLElement | null;
+  buyIronGeneration: HTMLButtonElement | null;
+  silverGenerationCost: HTMLElement | null;
+  silverGenerationLevel: HTMLElement | null;
+  silverGenerationStat: HTMLElement | null;
+  buySilverGeneration: HTMLButtonElement | null;
+  goldGenerationCost: HTMLElement | null;
+  goldGenerationLevel: HTMLElement | null;
+  goldGenerationStat: HTMLElement | null;
+  buyGoldGeneration: HTMLButtonElement | null;
   closeMinerPopupButton: HTMLButtonElement | null;
   popupSpeedStat: HTMLElement | null;
   popupRadiusStat: HTMLElement | null;
@@ -114,6 +142,10 @@ const state: GameState = {
   idleMinerOwned: 0,
   mapExpansions: 0,
   coalGenerationLevel: 0,
+  copperGenerationLevel: 0,
+  ironGenerationLevel: 0,
+  silverGenerationLevel: 0,
+  goldGenerationLevel: 0,
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
   idleMinerCooldowns: [],
@@ -128,6 +160,7 @@ const interactionState: InteractionState = {
   placementMode: false,
   upgradePanelOpen: false,
   statsPanelOpen: false,
+  resourceStatsOpen: false,
 };
 
 const idleMiner: UpgradeConfig = {
@@ -151,8 +184,47 @@ const minerRadiusUpgrade: UpgradeConfig = {
 const coalGenerationUpgrade: UpgradeConfig = {
   baseCost: 75,
   growth: 1.25,
-  bonusClicksPerSecond: 0.05,
 };
+
+const copperGenerationUpgrade: UpgradeConfig = {
+  baseCost: 120,
+  growth: 1.28,
+};
+
+const ironGenerationUpgrade: UpgradeConfig = {
+  baseCost: 220,
+  growth: 1.31,
+};
+
+const silverGenerationUpgrade: UpgradeConfig = {
+  baseCost: 420,
+  growth: 1.34,
+};
+
+const goldGenerationUpgrade: UpgradeConfig = {
+  baseCost: 800,
+  growth: 1.38,
+};
+
+const BASE_ORE_WEIGHTS: Record<OreType, number> = {
+  sand: 9200,
+  coal: 600,
+  copper: 140,
+  iron: 45,
+  silver: 12,
+  gold: 3,
+};
+
+const ORE_REWARDS: Record<OreType, number> = {
+  sand: 1,
+  coal: 3,
+  copper: 6,
+  iron: 12,
+  silver: 24,
+  gold: 48,
+};
+
+const ORE_ORDER: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
 
 const doubleActivationMinUpgrade: UpgradeConfig = {
   baseCost: 80,
@@ -177,6 +249,10 @@ const ui: UIElements = {
   reset: document.getElementById("reset") as HTMLButtonElement,
   mapEnvironment: document.getElementById("map-environment"),
   mapSize: document.getElementById("map-size"),
+  resourceStatsPanel: document.getElementById("resource-stats-panel"),
+  resourceStatsToggle: document.getElementById("resource-stats-toggle") as HTMLButtonElement,
+  closeResourceStatsButton: document.getElementById("close-resource-stats") as HTMLButtonElement,
+  resourceLegendBody: document.getElementById("resource-legend-body"),
   mapGrid: document.getElementById("map-grid"),
   minerRing: document.getElementById("miner-ring"),
   mapExpandCost: document.getElementById("map-expand-cost"),
@@ -198,6 +274,22 @@ const ui: UIElements = {
   coalGenerationLevel: document.getElementById("coal-generation-level"),
   coalGenerationStat: document.getElementById("coal-generation-stat"),
   buyCoalGeneration: document.getElementById("buy-coal-generation") as HTMLButtonElement,
+  copperGenerationCost: document.getElementById("copper-generation-cost"),
+  copperGenerationLevel: document.getElementById("copper-generation-level"),
+  copperGenerationStat: document.getElementById("copper-generation-stat"),
+  buyCopperGeneration: document.getElementById("buy-copper-generation") as HTMLButtonElement,
+  ironGenerationCost: document.getElementById("iron-generation-cost"),
+  ironGenerationLevel: document.getElementById("iron-generation-level"),
+  ironGenerationStat: document.getElementById("iron-generation-stat"),
+  buyIronGeneration: document.getElementById("buy-iron-generation") as HTMLButtonElement,
+  silverGenerationCost: document.getElementById("silver-generation-cost"),
+  silverGenerationLevel: document.getElementById("silver-generation-level"),
+  silverGenerationStat: document.getElementById("silver-generation-stat"),
+  buySilverGeneration: document.getElementById("buy-silver-generation") as HTMLButtonElement,
+  goldGenerationCost: document.getElementById("gold-generation-cost"),
+  goldGenerationLevel: document.getElementById("gold-generation-level"),
+  goldGenerationStat: document.getElementById("gold-generation-stat"),
+  buyGoldGeneration: document.getElementById("buy-gold-generation") as HTMLButtonElement,
   closeMinerPopupButton: document.getElementById("close-miner-popup") as HTMLButtonElement,
   popupUpgradeDoubleActivationMin: document.getElementById("popup-upgrade-double-activation-min") as HTMLButtonElement,
   popupDoubleActivationMinCost: document.getElementById("popup-double-activation-min-cost"),
@@ -291,12 +383,122 @@ function getMinerEffectRadiusPx(minerIndex: number): number {
   return BASE_MINER_EFFECT_RADIUS_PX * Math.sqrt(areaMultiplier);
 }
 
-function getCoalGenerationCost(): number {
-  return getUpgradeCost(coalGenerationUpgrade, state.coalGenerationLevel);
+function getOreUpgradeConfig(ore: UpgradableOre): UpgradeConfig {
+  switch (ore) {
+    case "coal":
+      return coalGenerationUpgrade;
+    case "copper":
+      return copperGenerationUpgrade;
+    case "iron":
+      return ironGenerationUpgrade;
+    case "silver":
+      return silverGenerationUpgrade;
+    case "gold":
+      return goldGenerationUpgrade;
+  }
 }
 
-function getCoalSpawnChance(): number {
-  return 0.05 * (1 + state.coalGenerationLevel * 0.5);
+function getOreGenerationLevel(ore: UpgradableOre): number {
+  switch (ore) {
+    case "coal":
+      return state.coalGenerationLevel;
+    case "copper":
+      return state.copperGenerationLevel;
+    case "iron":
+      return state.ironGenerationLevel;
+    case "silver":
+      return state.silverGenerationLevel;
+    case "gold":
+      return state.goldGenerationLevel;
+  }
+}
+
+function setOreGenerationLevel(ore: UpgradableOre, level: number): void {
+  switch (ore) {
+    case "coal":
+      state.coalGenerationLevel = level;
+      return;
+    case "copper":
+      state.copperGenerationLevel = level;
+      return;
+    case "iron":
+      state.ironGenerationLevel = level;
+      return;
+    case "silver":
+      state.silverGenerationLevel = level;
+      return;
+    case "gold":
+      state.goldGenerationLevel = level;
+      return;
+  }
+}
+
+function getOreUpgradeMultiplier(level: number): number {
+  if (level <= 0) {
+    return 1;
+  }
+  return 1.05 + Math.max(0, level - 1) * 0.025;
+}
+
+function getOreGenerationCost(ore: UpgradableOre): number {
+  return getUpgradeCost(getOreUpgradeConfig(ore), getOreGenerationLevel(ore));
+}
+
+function getOreEffectiveWeight(ore: OreType): number {
+  const baseWeight = BASE_ORE_WEIGHTS[ore];
+  if (ore === "sand") {
+    return baseWeight;
+  }
+  const level = getOreGenerationLevel(ore);
+  return Math.max(0.001, baseWeight * getOreUpgradeMultiplier(level));
+}
+
+function rollTileType(): OreType {
+  const weights: Array<{ ore: OreType; weight: number }> = [
+    { ore: "sand", weight: getOreEffectiveWeight("sand") },
+    { ore: "coal", weight: getOreEffectiveWeight("coal") },
+    { ore: "copper", weight: getOreEffectiveWeight("copper") },
+    { ore: "iron", weight: getOreEffectiveWeight("iron") },
+    { ore: "silver", weight: getOreEffectiveWeight("silver") },
+    { ore: "gold", weight: getOreEffectiveWeight("gold") },
+  ];
+
+  const totalWeight = weights.reduce((sum, entry) => sum + Math.max(0.001, entry.weight), 0);
+  let roll = Math.random() * totalWeight;
+
+  for (const entry of weights) {
+    roll -= Math.max(0.001, entry.weight);
+    if (roll <= 0) {
+      return entry.ore;
+    }
+  }
+
+  return "sand";
+}
+
+function getTileCoinValue(tileType: OreType): number {
+  return ORE_REWARDS[tileType] || 1;
+}
+
+function getOreDisplayName(ore: OreType): string {
+  return ore.charAt(0).toUpperCase() + ore.slice(1);
+}
+
+function renderResourceLegend(): void {
+  if (!ui.resourceLegendBody) {
+    return;
+  }
+
+  const weights = ORE_ORDER.map((ore) => ({ ore, weight: getOreEffectiveWeight(ore) }));
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+
+  ui.resourceLegendBody.innerHTML = weights
+    .map(({ ore, weight }) => {
+      const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
+      const chanceText = chancePercent < 0.1 ? chancePercent.toFixed(3) : chancePercent.toFixed(2);
+      return `<p class="resource-legend-row"><span>${getOreDisplayName(ore)}</span><span>${chanceText}%</span><span>${getTileCoinValue(ore)}</span></p>`;
+    })
+    .join("");
 }
 
 function getDoubleActivationMinCost(minerIndex: number): number {
@@ -339,10 +541,13 @@ function getActivationCountFromRoll(roll: number): number {
 }
 
 // Stat display functions for showing current vs next level
-function getCoalGenerationStatText(): string {
-  const current = 0.05 + state.coalGenerationLevel * 0.025;
-  const next = 0.05 + (state.coalGenerationLevel + 1) * 0.025;
-  return `Current: ${(current * 100).toFixed(1)}% → Upgrading to: ${(next * 100).toFixed(1)}% chance for coal tiles (3 coins)`;
+function getOreGenerationStatText(ore: UpgradableOre): string {
+  const currentLevel = getOreGenerationLevel(ore);
+  const currentBonusPercent = (getOreUpgradeMultiplier(currentLevel) - 1) * 100;
+  const nextBonusPercent = (getOreUpgradeMultiplier(currentLevel + 1) - 1) * 100;
+  const currentWeight = getOreEffectiveWeight(ore);
+  const nextWeight = BASE_ORE_WEIGHTS[ore] * getOreUpgradeMultiplier(currentLevel + 1);
+  return `Weight: ${round(currentWeight, 2).toLocaleString()} → ${round(nextWeight, 2).toLocaleString()} (+${currentBonusPercent.toFixed(1)}% → +${nextBonusPercent.toFixed(1)}%)`;
 }
 
 function getMinerSpeedStatText(minerIndex: number): string {
@@ -416,6 +621,10 @@ function saveGame(showStatus: boolean = true): void {
       idleMinerUpgrades: state.idleMinerUpgrades,
       mapExpansions: state.mapExpansions,
       coalGenerationLevel: state.coalGenerationLevel,
+      copperGenerationLevel: state.copperGenerationLevel,
+      ironGenerationLevel: state.ironGenerationLevel,
+      silverGenerationLevel: state.silverGenerationLevel,
+      goldGenerationLevel: state.goldGenerationLevel,
       savedAt: Date.now(),
     })
   );
@@ -503,12 +712,21 @@ function loadGame(): void {
 
     if (state.idleMinerUpgrades.length === 0 && state.idleMinerOwned > 0) {
       for (let index = 0; index < state.idleMinerOwned; index += 1) {
-        state.idleMinerUpgrades.push({ speedLevel: legacySpeedLevel, radiusLevel: legacyRadiusLevel });
+        state.idleMinerUpgrades.push({
+          speedLevel: legacySpeedLevel,
+          radiusLevel: legacyRadiusLevel,
+          doubleActivationMinLevel: 0,
+          doubleActivationMaxLevel: 0,
+        });
       }
     }
 
     state.mapExpansions = Number(parsed.mapExpansions) || 0;
     state.coalGenerationLevel = Number(parsed.coalGenerationLevel) || 0;
+    state.copperGenerationLevel = Number(parsed.copperGenerationLevel) || 0;
+    state.ironGenerationLevel = Number(parsed.ironGenerationLevel) || 0;
+    state.silverGenerationLevel = Number(parsed.silverGenerationLevel) || 0;
+    state.goldGenerationLevel = Number(parsed.goldGenerationLevel) || 0;
     syncIdleMinerState();
 
     const now = Date.now();
@@ -603,10 +821,34 @@ function setSettingsModalOpen(isOpen: boolean): void {
 function openMinerPanels(minerIndex: number): void {
   interactionState.selectedMinerIndex = minerIndex;
   interactionState.repositionMode = false;
+  interactionState.resourceStatsOpen = false;
   interactionState.upgradePanelOpen = true;
   interactionState.statsPanelOpen = true;
+  renderResourceStatsPanel();
   renderMinerStatsPanel();
   renderMinerPopup();
+}
+
+function renderResourceStatsPanel(): void {
+  if (!ui.resourceStatsPanel || !ui.resourceStatsToggle) {
+    return;
+  }
+  ui.resourceStatsPanel.classList.toggle("hidden", !interactionState.resourceStatsOpen);
+  ui.resourceStatsToggle.setAttribute("aria-expanded", String(interactionState.resourceStatsOpen));
+}
+
+function toggleResourceStatsPanel(): void {
+  const willOpen = !interactionState.resourceStatsOpen;
+  if (willOpen) {
+    closeMinerStatsPanel();
+  }
+  interactionState.resourceStatsOpen = willOpen;
+  renderResourceStatsPanel();
+}
+
+function closeResourceStatsPanel(): void {
+  interactionState.resourceStatsOpen = false;
+  renderResourceStatsPanel();
 }
 
 function closeMinerUpgradePanel(): void {
@@ -647,28 +889,51 @@ function closeMinerPanels(): void {
   }
 }
 
+function clearTileOreClasses(tile: HTMLElement): void {
+  tile.classList.remove("map-tile--coal", "map-tile--copper", "map-tile--iron", "map-tile--silver", "map-tile--gold");
+}
+
+function getTileAriaLabel(tileType: OreType): string {
+  switch (tileType) {
+    case "coal":
+      return "Coal tile";
+    case "copper":
+      return "Copper tile";
+    case "iron":
+      return "Iron tile";
+    case "silver":
+      return "Silver tile";
+    case "gold":
+      return "Gold tile";
+    default:
+      return "Sandy tile";
+  }
+}
+
+function applyTileType(tile: HTMLElement, tileType: OreType): void {
+  tile.dataset.tileType = tileType;
+  clearTileOreClasses(tile);
+  if (tileType !== "sand") {
+    tile.classList.add(`map-tile--${tileType}`);
+  }
+  tile.setAttribute("aria-label", getTileAriaLabel(tileType));
+}
+
 function activateTile(tile: HTMLElement, shouldRender: boolean = true): boolean {
   if (!(tile instanceof HTMLElement) || tile.classList.contains("map-tile--cooldown")) {
     return false;
   }
 
-  const isCoal = tile.dataset.tileType === "coal";
-  state.coins += isCoal ? 3 : 1;
+  const tileType = (tile.dataset.tileType as OreType) || "sand";
+  state.coins += getTileCoinValue(tileType);
   
   tile.classList.add("map-tile--cooldown");
-  tile.dataset.tileType = "";
-  tile.classList.remove("map-tile--coal");
+  tile.dataset.tileType = "sand";
+  clearTileOreClasses(tile);
   
   setTimeout(() => {
     tile.classList.remove("map-tile--cooldown");
-    // Regenerate tile type when cooldown ends
-    if (Math.random() < getCoalSpawnChance()) {
-      tile.dataset.tileType = "coal";
-      tile.classList.add("map-tile--coal");
-    } else {
-      tile.dataset.tileType = "sand";
-      tile.classList.remove("map-tile--coal");
-    }
+    applyTileType(tile, rollTileType());
   }, 1000);
 
   if (shouldRender) {
@@ -745,6 +1010,10 @@ function resetGame(): void {
   state.idleMinerOwned = 0;
   state.mapExpansions = 0;
   state.coalGenerationLevel = 0;
+  state.copperGenerationLevel = 0;
+  state.ironGenerationLevel = 0;
+  state.silverGenerationLevel = 0;
+  state.goldGenerationLevel = 0;
   state.lastTick = Date.now();
   state.lastRenderedMapSize = 0;
   state.idleMinerCooldowns = [];
@@ -766,14 +1035,34 @@ function buyMapExpansion(): void {
   render();
 }
 
-function buyCoalGeneration(): void {
-  const cost = getCoalGenerationCost();
+function buyOreGeneration(ore: UpgradableOre): void {
+  const cost = getOreGenerationCost(ore);
   if (!canAfford(cost)) {
     return;
   }
   state.coins -= cost;
-  state.coalGenerationLevel += 1;
+  setOreGenerationLevel(ore, getOreGenerationLevel(ore) + 1);
   render();
+}
+
+function buyCoalGeneration(): void {
+  buyOreGeneration("coal");
+}
+
+function buyCopperGeneration(): void {
+  buyOreGeneration("copper");
+}
+
+function buyIronGeneration(): void {
+  buyOreGeneration("iron");
+}
+
+function buySilverGeneration(): void {
+  buyOreGeneration("silver");
+}
+
+function buyGoldGeneration(): void {
+  buyOreGeneration("gold");
 }
 
 function buyDoubleActivationMin(): void {
@@ -815,15 +1104,8 @@ function renderMap(): void {
     const tile = document.createElement("div");
     tile.className = "map-tile";
     tile.dataset.tileIndex = index.toString();
-    
-    // Randomly assign coal or sand type
-    const isCoal = Math.random() < getCoalSpawnChance();
-    tile.dataset.tileType = isCoal ? "coal" : "sand";
-    if (isCoal) {
-      tile.classList.add("map-tile--coal");
-    }
-    
-    tile.setAttribute("aria-label", isCoal ? "Coal tile" : "Sandy tile");
+
+    applyTileType(tile, rollTileType());
     ui.mapGrid.appendChild(tile);
   }
 
@@ -1013,7 +1295,11 @@ function render(): void {
   const cps = getCoinsPerSecond();
   const idleMinerCost = getIdleMinerCost();
   const mapCost = getMapExpansionCost();
-  const coalCost = getCoalGenerationCost();
+  const coalCost = getOreGenerationCost("coal");
+  const copperCost = getOreGenerationCost("copper");
+  const ironCost = getOreGenerationCost("iron");
+  const silverCost = getOreGenerationCost("silver");
+  const goldCost = getOreGenerationCost("gold");
   const mapSize = getMapSize();
 
   if (ui.coins) ui.coins.textContent = format(state.coins);
@@ -1027,10 +1313,28 @@ function render(): void {
   if (ui.expandMap) ui.expandMap.disabled = !canAfford(mapCost);
   if (ui.coalGenerationCost) ui.coalGenerationCost.textContent = coalCost.toLocaleString();
   if (ui.coalGenerationLevel) ui.coalGenerationLevel.textContent = state.coalGenerationLevel.toString();
-  if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getCoalGenerationStatText();
+  if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getOreGenerationStatText("coal");
   if (ui.buyCoalGeneration) ui.buyCoalGeneration.disabled = !canAfford(coalCost);
+  if (ui.copperGenerationCost) ui.copperGenerationCost.textContent = copperCost.toLocaleString();
+  if (ui.copperGenerationLevel) ui.copperGenerationLevel.textContent = state.copperGenerationLevel.toString();
+  if (ui.copperGenerationStat) ui.copperGenerationStat.textContent = getOreGenerationStatText("copper");
+  if (ui.buyCopperGeneration) ui.buyCopperGeneration.disabled = !canAfford(copperCost);
+  if (ui.ironGenerationCost) ui.ironGenerationCost.textContent = ironCost.toLocaleString();
+  if (ui.ironGenerationLevel) ui.ironGenerationLevel.textContent = state.ironGenerationLevel.toString();
+  if (ui.ironGenerationStat) ui.ironGenerationStat.textContent = getOreGenerationStatText("iron");
+  if (ui.buyIronGeneration) ui.buyIronGeneration.disabled = !canAfford(ironCost);
+  if (ui.silverGenerationCost) ui.silverGenerationCost.textContent = silverCost.toLocaleString();
+  if (ui.silverGenerationLevel) ui.silverGenerationLevel.textContent = state.silverGenerationLevel.toString();
+  if (ui.silverGenerationStat) ui.silverGenerationStat.textContent = getOreGenerationStatText("silver");
+  if (ui.buySilverGeneration) ui.buySilverGeneration.disabled = !canAfford(silverCost);
+  if (ui.goldGenerationCost) ui.goldGenerationCost.textContent = goldCost.toLocaleString();
+  if (ui.goldGenerationLevel) ui.goldGenerationLevel.textContent = state.goldGenerationLevel.toString();
+  if (ui.goldGenerationStat) ui.goldGenerationStat.textContent = getOreGenerationStatText("gold");
+  if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost);
 
   renderMap();
+  renderResourceStatsPanel();
+  renderResourceLegend();
   renderMinerRing();
   renderMinerStatsPanel();
   renderMinerPopup();
@@ -1070,6 +1374,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setSettingsModalOpen(false);
     closeMinerPanels();
+    closeResourceStatsPanel();
   }
 });
 
@@ -1167,6 +1472,12 @@ if (ui.closeMinerPopupButton) {
 if (ui.closeMinerStatsButton) {
   ui.closeMinerStatsButton.addEventListener("click", closeMinerStatsPanel);
 }
+if (ui.resourceStatsToggle) {
+  ui.resourceStatsToggle.addEventListener("click", toggleResourceStatsPanel);
+}
+if (ui.closeResourceStatsButton) {
+  ui.closeResourceStatsButton.addEventListener("click", closeResourceStatsPanel);
+}
 if (ui.buyIdleMiner) {
   ui.buyIdleMiner.addEventListener("click", buyIdleMiner);
 }
@@ -1175,6 +1486,18 @@ if (ui.expandMap) {
 }
 if (ui.buyCoalGeneration) {
   ui.buyCoalGeneration.addEventListener("click", buyCoalGeneration);
+}
+if (ui.buyCopperGeneration) {
+  ui.buyCopperGeneration.addEventListener("click", buyCopperGeneration);
+}
+if (ui.buyIronGeneration) {
+  ui.buyIronGeneration.addEventListener("click", buyIronGeneration);
+}
+if (ui.buySilverGeneration) {
+  ui.buySilverGeneration.addEventListener("click", buySilverGeneration);
+}
+if (ui.buyGoldGeneration) {
+  ui.buyGoldGeneration.addEventListener("click", buyGoldGeneration);
 }
 if (ui.popupUpgradeDoubleActivationMin) {
   ui.popupUpgradeDoubleActivationMin.addEventListener("click", buyDoubleActivationMin);

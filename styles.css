@@ -182,6 +182,59 @@ strong {
   opacity: 0.85;
 }
 
+.map-info-toggle {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 5;
+}
+
+.left-side-menu {
+  position: absolute;
+  right: calc(100% + 1rem);
+  top: 0;
+}
+
+.left-side-menu.hidden {
+  display: none !important;
+}
+
+.resource-stats-panel {
+  width: 240px;
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.resource-stats-panel h3 {
+  font-size: 0.8rem;
+  color: #9bbdeb;
+}
+
+.resource-legend-header,
+.resource-legend-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  align-items: center;
+}
+
+.resource-legend-header {
+  opacity: 0.75;
+  border-bottom: 1px solid rgb(156 181 235 / 20%);
+  padding-bottom: 0.2rem;
+}
+
+.resource-legend-row {
+  margin: 0;
+}
+
+.resource-legend-body {
+  display: grid;
+  gap: 0.15rem;
+}
+
 .map-environment {
   position: relative;
   display: grid;
@@ -205,9 +258,6 @@ strong {
 }
 
 .miner-stats-panel {
-  position: absolute;
-  right: calc(100% + 1rem);
-  top: 0;
   width: 220px;
   display: grid;
   gap: 0.45rem;
@@ -340,6 +390,30 @@ strong {
   filter: brightness(1.1);
 }
 
+.map-tile--copper {
+  background: #b7773f;
+  border-color: #7f4d24;
+  box-shadow: inset 0 1px 1px #d89a68;
+}
+
+.map-tile--iron {
+  background: #87909b;
+  border-color: #5f6670;
+  box-shadow: inset 0 1px 1px #a6adb8;
+}
+
+.map-tile--silver {
+  background: #bcc4d6;
+  border-color: #8c93a6;
+  box-shadow: inset 0 1px 1px #dce2ef;
+}
+
+.map-tile--gold {
+  background: #d9b455;
+  border-color: #9f7d2b;
+  box-shadow: inset 0 1px 1px #ebd083;
+}
+
 button {
   border: 1px solid #3a486a;
   background: #223051;
@@ -418,6 +492,21 @@ button:disabled {
     position: static;
     width: 100%;
     margin-bottom: 0.75rem;
+  }
+
+  .resource-stats-panel {
+    position: static;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+
+  .left-side-menu {
+    position: static;
+  }
+
+  .map-info-toggle {
+    position: static;
+    margin-bottom: 0.35rem;
   }
 
   .topbar {

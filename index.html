@@ -26,7 +26,20 @@
 
       <section class="content-layout">
         <section class="panel map" aria-label="Map">
-          <section id="miner-stats-panel" class="panel miner-stats-panel hidden" aria-label="Miner stats">
+          <button id="resource-stats-toggle" class="icon-button map-info-toggle" aria-label="Open resource stats" aria-expanded="false">ⓘ</button>
+          <section id="resource-stats-panel" class="panel left-side-menu resource-stats-panel hidden" aria-label="Resource stats">
+            <div class="miner-popup-header">
+              <h3>Resource Stats</h3>
+              <button id="close-resource-stats" class="close-button" aria-label="Close resource stats">✕</button>
+            </div>
+            <div class="resource-legend-header">
+              <span>Resource</span>
+              <span>Chance</span>
+              <span>Value</span>
+            </div>
+            <div id="resource-legend-body" class="resource-legend-body"></div>
+          </section>
+          <section id="miner-stats-panel" class="panel left-side-menu miner-stats-panel hidden" aria-label="Miner stats">
             <div class="miner-popup-header">
               <h3 id="miner-stats-title">Miner Stats</h3>
               <button id="close-miner-stats" class="close-button" aria-label="Close miner stats">✕</button>
@@ -74,6 +87,42 @@
             </div>
             <small id="coal-generation-stat">Current: 5.0% → Upgrading to: 7.5% chance for coal tiles (3 coins)</small>
             <span class="upgrade-cost-row">Cost: <span id="coal-generation-cost">75</span></span>
+          </button>
+
+          <button id="buy-copper-generation" class="upgrade">
+            <div class="upgrade-header">
+              <span>Copper Generation</span>
+              <strong class="upgrade-quantity" id="copper-generation-level">0</strong>
+            </div>
+            <small id="copper-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
+            <span class="upgrade-cost-row">Cost: <span id="copper-generation-cost">120</span></span>
+          </button>
+
+          <button id="buy-iron-generation" class="upgrade">
+            <div class="upgrade-header">
+              <span>Iron Generation</span>
+              <strong class="upgrade-quantity" id="iron-generation-level">0</strong>
+            </div>
+            <small id="iron-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
+            <span class="upgrade-cost-row">Cost: <span id="iron-generation-cost">220</span></span>
+          </button>
+
+          <button id="buy-silver-generation" class="upgrade">
+            <div class="upgrade-header">
+              <span>Silver Generation</span>
+              <strong class="upgrade-quantity" id="silver-generation-level">0</strong>
+            </div>
+            <small id="silver-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
+            <span class="upgrade-cost-row">Cost: <span id="silver-generation-cost">420</span></span>
+          </button>
+
+          <button id="buy-gold-generation" class="upgrade">
+            <div class="upgrade-header">
+              <span>Gold Generation</span>
+              <strong class="upgrade-quantity" id="gold-generation-level">0</strong>
+            </div>
+            <small id="gold-generation-stat">Current: +0.0% weight → Upgrading to: +5.0%</small>
+            <span class="upgrade-cost-row">Cost: <span id="gold-generation-cost">800</span></span>
           </button>
 
           <section id="miner-popup" class="miner-popup hidden" aria-label="Miner options">
