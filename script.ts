@@ -1,74 +1,39 @@
-// Constants
-const SAVE_KEY = "numis-idle-save-v1";
-const TILE_SIZE_PX = 38;
-const TILE_GAP_PX = 6;
-const BASE_MINER_EFFECT_RADIUS_PX = 22.5;
-const MIN_TILE_COVERAGE_IN_RADIUS = 0.3;
-const SPECIALIZATION_COST = 250;
-
-// Type definitions
-interface Unit {
-  speedLevel: number;
-  radiusLevel: number;
-  specializationUnlocked: boolean;
-  specialization: UnitSpecialization;
-  targeting: MinerTargeting;
-  specializationData: UnitSpecializationData;
-}
-
-type UnitSpecializationData =
-  | { type: "Worker" }
-  | { type: "Crit Build"; critChanceLevel: number; critMultiplierLevel: number }
-  | { type: "Chain Lightning"; chainReactionLevel: number; chainReactionChanceLevel: number }
-  | { type: "Prospector"; veinFinderLevel: number }
-  | { type: "Multi Activator"; multiActivationMinLevel: number; multiActivationMaxLevel: number };
-
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface Bounds {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-interface UpgradeConfig {
-  baseCost: number;
-  growth: number;
-  bonusClicksPerSecond?: number;
-  triggerIntervalSeconds?: number;
-  radiusMultiplierPerLevel?: number;
-}
-
-interface ResourceConfig {
-  ore: OreType;
-  name: string;
-  weight: number;
-  value: number;
-  baseCost: number;
-  growth: number;
-  resourceLevel: number;
-}
-
-interface GameState {
-  coins: number;
-  idleMinerOwned: number;
-  mapExpansions: number;
-  resources: ResourceConfig[];
-  lastTick: number;
-  lastRenderedMapSize: number;
-  idleMinerCooldowns: number[];
-  idleMinerPositions: (Position | null)[];
-  units: Unit[];
-}
-
-type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold";
-type UpgradableOre = Exclude<OreType, "sand">;
-type UnitSpecialization = "Worker" | "Crit Build" | "Chain Lightning" | "Prospector" | "Multi Activator";
-type MinerTargeting = "random" | "high-quality" | "low-quality";
+import {
+  BASE_MINER_EFFECT_RADIUS_PX,
+  MIN_TILE_COVERAGE_IN_RADIUS,
+  SAVE_KEY,
+  SPECIALIZATION_COST,
+} from "./game-constants";
+import {
+  clamp,
+  getDefaultMinerPosition,
+  getTileBoundsByIndex,
+  getTileCoverageInMinerRadius,
+} from "./map-geometry";
+import type {
+  GameState,
+  MinerTargeting,
+  OreType,
+  Position,
+  ResourceConfig,
+  Unit,
+  UnitSpecialization,
+  UpgradeConfig,
+  UpgradableOre,
+} from "./game-types";
+import { createDefaultResources, DEFAULT_RESOURCES } from "./resources";
+import { clearSavedGame, loadGameState, saveGameState } from "./persistence";
+import { getChanceText, shouldRevealNextOre } from "./rendering";
+import { runIdleMinersLoop } from "./game-loop";
+import { renderResourceStatsPanelView, renderUpgradesAccordionView } from "./ui-renderers";
+import { renderMinerPopupView, renderMinerStatsPanelView } from "./ui-miner-panels";
+import { bindUiEvents } from "./ui-events";
+import {
+  buildSpecializationData,
+  getDefaultSpecializationData,
+  getSpecializationLabel,
+  normalizeSpecialization,
+} from "./unit-specialization";
 
 interface InteractionState {
   activeMinerIndex: number | null;
@@ -235,19 +200,6 @@ const minerRadiusUpgrade: UpgradeConfig = {
   radiusMultiplierPerLevel: 1.25,
 };
 
-const DEFAULT_RESOURCES: ResourceConfig[] = [
-  { ore: "sand", name: "Sand", weight: 9200, value: 1, baseCost: 0, growth: 1, resourceLevel: 0 },
-  { ore: "coal", name: "Coal", weight: 600, value: 3, baseCost: 75, growth: 1.25, resourceLevel: 0 },
-  { ore: "copper", name: "Copper", weight: 140, value: 10, baseCost: 120, growth: 1.28, resourceLevel: 0 },
-  { ore: "iron", name: "Iron", weight: 45, value: 25, baseCost: 220, growth: 1.31, resourceLevel: 0 },
-  { ore: "silver", name: "Silver", weight: 12, value: 66, baseCost: 420, growth: 1.34, resourceLevel: 0 },
-  { ore: "gold", name: "Gold", weight: 3, value: 200, baseCost: 800, growth: 1.38, resourceLevel: 0 },
-];
-
-function createDefaultResources(): ResourceConfig[] {
-  return DEFAULT_RESOURCES.map((resource) => ({ ...resource }));
-}
-
 state.resources = createDefaultResources();
 
 const doubleActivationMinUpgrade: UpgradeConfig = {
@@ -398,10 +350,6 @@ function getMapSize(): number {
   return 1 + state.mapExpansions;
 }
 
-function getMapPixelSize(mapSize: number): number {
-  return mapSize * TILE_SIZE_PX + (mapSize - 1) * TILE_GAP_PX;
-}
-
 function getMapExpansionCost(): number {
   const nextUpgradeCount = state.mapExpansions + 1;
   return 10 * nextUpgradeCount ** 3;
@@ -410,66 +358,6 @@ function getMapExpansionCost(): number {
 function getIdleMinerCost(): number {
   const nextCount = state.idleMinerOwned + 1;
   return idleMiner.baseCost * nextCount ** 3;
-}
-
-function getDefaultSpecializationData(specialization: UnitSpecialization): UnitSpecializationData {
-  switch (specialization) {
-    case "Crit Build":
-      return { type: specialization, critChanceLevel: 0, critMultiplierLevel: 0 };
-    case "Chain Lightning":
-      return { type: specialization, chainReactionLevel: 0, chainReactionChanceLevel: 0 };
-    case "Prospector":
-      return { type: specialization, veinFinderLevel: 0 };
-    case "Multi Activator":
-      return { type: specialization, multiActivationMinLevel: 0, multiActivationMaxLevel: 0 };
-    default:
-      return { type: "Worker" };
-  }
-}
-
-function normalizeSpecialization(value: unknown): UnitSpecialization {
-  switch (value) {
-    case "Prospector":
-      return "Prospector";
-    case "Crit Build":
-      return "Crit Build";
-    case "Chain Lightning":
-      return "Chain Lightning";
-    case "Multi Activator":
-      return "Multi Activator";
-    default:
-      return "Worker";
-  }
-}
-
-function buildSpecializationData(raw: Record<string, unknown>, specialization: UnitSpecialization): UnitSpecializationData {
-  switch (specialization) {
-    case "Crit Build":
-      return {
-        type: "Crit Build",
-        critChanceLevel: Number(raw.critChanceLevel) || 0,
-        critMultiplierLevel: Number(raw.critMultiplierLevel) || 0,
-      };
-    case "Chain Lightning":
-      return {
-        type: "Chain Lightning",
-        chainReactionLevel: Number(raw.chainReactionLevel) || 0,
-        chainReactionChanceLevel: Number(raw.chainReactionChanceLevel) || 0,
-      };
-    case "Prospector":
-      return {
-        type: "Prospector",
-        veinFinderLevel: Number(raw.veinFinderLevel) || 0,
-      };
-    case "Multi Activator":
-      return {
-        type: "Multi Activator",
-        multiActivationMinLevel: Number(raw.multiActivationMinLevel) || 0,
-        multiActivationMaxLevel: Number(raw.multiActivationMaxLevel) || 0,
-      };
-    default:
-      return { type: "Worker" };
-  }
 }
 
 function getMinerUpgrade(minerIndex: number): Unit {
@@ -653,7 +541,7 @@ function renderResourceLegend(): void {
   ui.resourceLegendBody.innerHTML = weights
     .map(({ ore, weight }) => {
       const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
-      const chanceText = chancePercent < 0.1 ? chancePercent.toFixed(3) : chancePercent.toFixed(2);
+      const chanceText = getChanceText(chancePercent);
       return `<p class="resource-legend-row"><span>${getOreDisplayName(ore)}</span><span>${chanceText}%</span><span>${getTileCoinValue(ore)}</span></p>`;
     })
     .join("");
@@ -848,21 +736,6 @@ function getChainReactionStatText(minerIndex: number): string {
   return `Current: ${currentChance}% chance, ${currentLength} adjacent chain(s) → Upgrading to: ${nextLength}`;
 }
 
-function getSpecializationLabel(value: UnitSpecialization): string {
-  switch (value) {
-    case "Prospector":
-      return "🧭 Prospector";
-    case "Crit Build":
-      return "🎯 Crit Build";
-    case "Chain Lightning":
-      return "Chain Lightning";
-    case "Multi Activator":
-      return "⏩ Multi Activator";
-    default:
-      return "Worker";
-  }
-}
-
 function getMinerDisplayName(minerIndex: number): string {
   const spec = getMinerUpgrade(minerIndex).specialization;
   const number = minerIndex + 1;
@@ -994,19 +867,7 @@ function canAfford(cost: number): boolean {
 }
 
 function saveGame(showStatus: boolean = true): void {
-  localStorage.setItem(
-    SAVE_KEY,
-    JSON.stringify({
-      coins: state.coins,
-      idleMinerOwned: state.idleMinerOwned,
-      idleMinerCooldowns: state.idleMinerCooldowns,
-      idleMinerPositions: state.idleMinerPositions,
-      units: state.units,
-      mapExpansions: state.mapExpansions,
-      resources: state.resources,
-      savedAt: Date.now(),
-    })
-  );
+  saveGameState(SAVE_KEY, state);
 
   if (showStatus) {
     setStatus("Saved.");
@@ -1049,109 +910,14 @@ function syncIdleMinerState(): void {
 }
 
 function loadGame(): void {
-  const raw = localStorage.getItem(SAVE_KEY);
-  if (!raw) {
+  const outcome = loadGameState(SAVE_KEY, state, syncIdleMinerState, getCoinsPerSecond, round);
+  if (outcome.invalid) {
+    setStatus("Save data was invalid and has been ignored.");
     return;
   }
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    state.coins = Number(parsed.coins) || 0;
-    state.idleMinerOwned = Number(parsed.idleMinerOwned) || 0;
-
-    state.idleMinerCooldowns = Array.isArray(parsed.idleMinerCooldowns)
-      ? parsed.idleMinerCooldowns.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value >= 0)
-      : [];
-
-    state.idleMinerPositions = Array.isArray(parsed.idleMinerPositions)
-      ? parsed.idleMinerPositions
-          .map((position: unknown) => {
-            if (!position || typeof position !== "object") {
-              return null;
-            }
-            const x = Number((position as Record<string, unknown>).x);
-            const y = Number((position as Record<string, unknown>).y);
-            if (!Number.isFinite(x) || !Number.isFinite(y)) {
-              return null;
-            }
-            return { x, y };
-          })
-          .filter((position) => position !== null)
-      : [];
-
-    const rawUnits = Array.isArray(parsed.units) ? parsed.units : [];
-
-    state.units = Array.isArray(rawUnits)
-      ? rawUnits
-          .map((entry: unknown) => {
-            const unit = entry as Record<string, unknown>;
-            const specialization = normalizeSpecialization(unit.specialization);
-            return {
-              speedLevel: Number(unit?.speedLevel) || 0,
-              radiusLevel: Number(unit?.radiusLevel) || 0,
-              specializationUnlocked: Boolean(unit?.specializationUnlocked),
-              specialization,
-              targeting: (unit?.targeting as MinerTargeting) || "random",
-              specializationData: buildSpecializationData(
-                ((unit?.specializationData as Record<string, unknown> | undefined) || {}) as Record<string, unknown>,
-                specialization
-              ),
-            };
-          })
-          .filter((unit) => unit.speedLevel >= 0 && unit.radiusLevel >= 0)
-      : [];
-
-    if (state.units.length === 0 && state.idleMinerOwned > 0) {
-      for (let index = 0; index < state.idleMinerOwned; index += 1) {
-        state.units.push({
-          speedLevel: 0,
-          radiusLevel: 0,
-          specializationUnlocked: false,
-          specialization: "Worker",
-          targeting: "random",
-          specializationData: getDefaultSpecializationData("Worker"),
-        });
-      }
-    }
-
-    state.mapExpansions = Number(parsed.mapExpansions) || 0;
-    state.resources = createDefaultResources();
-    if (Array.isArray(parsed.resources)) {
-      for (const entry of parsed.resources) {
-        const resource = entry as Partial<ResourceConfig>;
-        if (!resource.ore) {
-          continue;
-        }
-        const existing = state.resources.find((item) => item.ore === resource.ore);
-        if (!existing) {
-          continue;
-        }
-        existing.resourceLevel = Math.max(0, Number(resource.resourceLevel) || 0);
-      }
-    }
-    syncIdleMinerState();
-
-    const now = Date.now();
-    const savedAt = Number(parsed.savedAt) || now;
-    const secondsAway = Math.min((now - savedAt) / 1000, 8 * 60 * 60);
-    const awayCoins = round(getCoinsPerSecond() * secondsAway, 0);
-    state.coins += awayCoins;
-
-    setStatus(`Welcome back! Earned ${awayCoins.toLocaleString()} while away.`);
-  } catch {
-    setStatus("Save data was invalid and has been ignored.");
+  if (outcome.hasSave) {
+    setStatus(`Welcome back! Earned ${outcome.awayCoins.toLocaleString()} while away.`);
   }
-}
-
-function getDefaultMinerPosition(index: number, count: number): Position {
-  const mapSize = getMapSize();
-  const mapPixelSize = getMapPixelSize(mapSize);
-  const ringRadius = Math.max(26, mapPixelSize * 0.28);
-  const angle = (index / Math.max(1, count)) * (Math.PI * 2) - Math.PI / 2;
-  return {
-    x: Math.cos(angle) * ringRadius,
-    y: Math.sin(angle) * ringRadius,
-  };
 }
 
 function getMinerPosition(minerIndex: number): Position {
@@ -1159,43 +925,7 @@ function getMinerPosition(minerIndex: number): Position {
   if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
     return position;
   }
-  return getDefaultMinerPosition(minerIndex, state.idleMinerOwned);
-}
-
-function getTileBoundsByIndex(tileIndex: number, mapSize: number): Bounds {
-  const column = tileIndex % mapSize;
-  const row = Math.floor(tileIndex / mapSize);
-  const mapPixelSize = getMapPixelSize(mapSize);
-  const left = -mapPixelSize / 2 + column * (TILE_SIZE_PX + TILE_GAP_PX);
-  const top = -mapPixelSize / 2 + row * (TILE_SIZE_PX + TILE_GAP_PX);
-  return {
-    left,
-    top,
-    right: left + TILE_SIZE_PX,
-    bottom: top + TILE_SIZE_PX,
-  };
-}
-
-function getTileCoverageInMinerRadius(minerPosition: Position, tileBounds: Bounds, radiusPx: number): number {
-  const sampleCountPerAxis = 5;
-  const totalSamples = sampleCountPerAxis * sampleCountPerAxis;
-  const step = TILE_SIZE_PX / sampleCountPerAxis;
-  const radiusSquared = radiusPx * radiusPx;
-  let insideSamples = 0;
-
-  for (let row = 0; row < sampleCountPerAxis; row += 1) {
-    for (let column = 0; column < sampleCountPerAxis; column += 1) {
-      const sampleX = tileBounds.left + (column + 0.5) * step;
-      const sampleY = tileBounds.top + (row + 0.5) * step;
-      const dx = sampleX - minerPosition.x;
-      const dy = sampleY - minerPosition.y;
-      if (dx * dx + dy * dy <= radiusSquared) {
-        insideSamples += 1;
-      }
-    }
-  }
-
-  return insideSamples / totalSamples;
+  return getDefaultMinerPosition(minerIndex, state.idleMinerOwned, getMapSize());
 }
 
 function getEligibleTilesForMiner(minerIndex: number, availableTiles: HTMLElement[], mapSize: number): HTMLElement[] {
@@ -1297,11 +1027,11 @@ function openMinerPanels(minerIndex: number): void {
 }
 
 function renderResourceStatsPanel(): void {
-  if (!ui.resourceStatsPanel || !ui.resourceStatsToggle) {
-    return;
-  }
-  ui.resourceStatsPanel.classList.toggle("hidden", !interactionState.resourceStatsOpen);
-  ui.resourceStatsToggle.setAttribute("aria-expanded", String(interactionState.resourceStatsOpen));
+  renderResourceStatsPanelView({
+    resourceStatsPanel: ui.resourceStatsPanel,
+    resourceStatsToggle: ui.resourceStatsToggle,
+    isOpen: interactionState.resourceStatsOpen,
+  });
 }
 
 function toggleResourceStatsPanel(): void {
@@ -1319,17 +1049,11 @@ function closeResourceStatsPanel(): void {
 }
 
 function renderUpgradesAccordion(): void {
-  if (ui.upgradesAccordionBody) {
-    ui.upgradesAccordionBody.classList.toggle("hidden", !interactionState.upgradesAccordionOpen);
-  }
-  if (ui.toggleUpgradesAccordion) {
-    ui.toggleUpgradesAccordion.textContent = interactionState.upgradesAccordionOpen ? "▾" : "▸";
-    ui.toggleUpgradesAccordion.setAttribute("aria-expanded", String(interactionState.upgradesAccordionOpen));
-    ui.toggleUpgradesAccordion.setAttribute(
-      "aria-label",
-      interactionState.upgradesAccordionOpen ? "Collapse upgrades" : "Expand upgrades"
-    );
-  }
+  renderUpgradesAccordionView({
+    upgradesAccordionBody: ui.upgradesAccordionBody,
+    toggleUpgradesAccordion: ui.toggleUpgradesAccordion,
+    isOpen: interactionState.upgradesAccordionOpen,
+  });
 }
 
 function toggleUpgradesAccordion(): void {
@@ -1502,7 +1226,7 @@ function toggleMinerRepositionMode(): void {
 }
 
 function resetGame(): void {
-  localStorage.removeItem(SAVE_KEY);
+  clearSavedGame(SAVE_KEY);
   state.coins = 0;
   state.idleMinerOwned = 0;
   state.mapExpansions = 0;
@@ -1702,15 +1426,11 @@ function renderMinerRing(): void {
   }
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
 function moveMinerToPointer(clientX: number, clientY: number): void {
-  const minerIndex = interactionState.activeMinerIndex;
-  if (minerIndex === null || !ui.mapEnvironment) {
+  if (!interactionState.placementMode || interactionState.selectedMinerIndex === null || !ui.mapEnvironment) {
     return;
   }
+  const minerIndex = interactionState.selectedMinerIndex;
 
   const bounds = ui.mapEnvironment.getBoundingClientRect();
   const centerX = bounds.left + bounds.width / 2;
@@ -1726,10 +1446,54 @@ function moveMinerToPointer(clientX: number, clientY: number): void {
 }
 
 function renderMinerPopup(): void {
-  if (!ui.minerPopup) return;
   const minerIndex = interactionState.selectedMinerIndex;
-  if (!interactionState.upgradePanelOpen || minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
-    ui.minerPopup.classList.add("hidden");
+  if (minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+    renderMinerPopupView(ui, {
+      isVisible: false,
+      title: "",
+      speedLevel: 0,
+      radiusLevel: 0,
+      doubleActivationMinLevel: 0,
+      doubleActivationMaxLevel: 0,
+      veinFinderLevel: 0,
+      critChanceLevel: 0,
+      critMultiplierLevel: 0,
+      chainReactionLevel: 0,
+      speedCost: 0,
+      radiusCost: 0,
+      doubleActivationMinCost: 0,
+      doubleActivationMaxCost: 0,
+      veinFinderCost: 0,
+      critChanceCost: 0,
+      critMultiplierCost: 0,
+      chainReactionCost: 0,
+      speedStat: "",
+      radiusStat: "",
+      doubleActivationMinStat: "",
+      doubleActivationMaxStat: "",
+      veinFinderStat: "",
+      critChanceStat: "",
+      critMultiplierStat: "",
+      chainReactionStat: "",
+      specStatus: "",
+      canUnlockClass: false,
+      specAffordable: false,
+      canChooseClass: false,
+      targeting: "random",
+      showDoubleActivation: false,
+      showVeinFinder: false,
+      showCrit: false,
+      showChainLightning: false,
+      canBuySpeed: false,
+      canBuyRadius: false,
+      canBuyDoubleActivationMin: false,
+      canBuyDoubleActivationMax: false,
+      canBuyVeinFinder: false,
+      canBuyCritChance: false,
+      canBuyCritMultiplier: false,
+      canBuyChainReaction: false,
+      placementMode: interactionState.placementMode,
+    });
     return;
   }
 
@@ -1755,86 +1519,76 @@ function renderMinerPopup(): void {
   const critData = upgrade.specializationData.type === "Crit Build" ? upgrade.specializationData : null;
   const chainData = upgrade.specializationData.type === "Chain Lightning" ? upgrade.specializationData : null;
 
-  ui.minerPopup.classList.remove("hidden");
-  if (ui.minerPopupTitle) ui.minerPopupTitle.textContent = getMinerDisplayName(minerIndex);
-  if (ui.popupSpeedLevel) ui.popupSpeedLevel.textContent = upgrade.speedLevel.toString();
-  if (ui.popupRadiusLevel) ui.popupRadiusLevel.textContent = upgrade.radiusLevel.toString();
-  if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = (multiData?.multiActivationMinLevel ?? 0).toString();
-  if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = (multiData?.multiActivationMaxLevel ?? 0).toString();
-  if (ui.popupVeinFinderLevel) ui.popupVeinFinderLevel.textContent = (prospectorData?.veinFinderLevel ?? 0).toString();
-  if (ui.popupCritChanceLevel) ui.popupCritChanceLevel.textContent = (critData?.critChanceLevel ?? 0).toString();
-  if (ui.popupCritMultiplierLevel) ui.popupCritMultiplierLevel.textContent = (critData?.critMultiplierLevel ?? 0).toString();
-  if (ui.popupChainReactionLevel) ui.popupChainReactionLevel.textContent = (chainData?.chainReactionLevel ?? 0).toString();
-  if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = speedCost.toLocaleString();
-  if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = radiusCost.toLocaleString();
-  if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = doubleActivationMinCost.toLocaleString();
-  if (ui.popupDoubleActivationMaxCost) ui.popupDoubleActivationMaxCost.textContent = doubleActivationMaxCost.toLocaleString();
-  if (ui.popupVeinFinderCost) ui.popupVeinFinderCost.textContent = veinFinderCost.toLocaleString();
-  if (ui.popupCritChanceCost) ui.popupCritChanceCost.textContent = critChanceCost.toLocaleString();
-  if (ui.popupCritMultiplierCost) ui.popupCritMultiplierCost.textContent = critMultiplierCost.toLocaleString();
-  if (ui.popupChainReactionCost) ui.popupChainReactionCost.textContent = chainReactionCost.toLocaleString();
-  if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = getMinerSpeedStatText(minerIndex);
-  if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = getMinerRadiusStatText(minerIndex);
-  if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = getDoubleActivationMinStatText(minerIndex);
-  if (ui.popupDoubleActivationMaxStat) ui.popupDoubleActivationMaxStat.textContent = getDoubleActivationMaxStatText(minerIndex);
-  if (ui.popupVeinFinderStat) ui.popupVeinFinderStat.textContent = getVeinFinderStatText(minerIndex);
-  if (ui.popupCritChanceStat) ui.popupCritChanceStat.textContent = getCritChanceStatText(minerIndex);
-  if (ui.popupCritMultiplierStat) ui.popupCritMultiplierStat.textContent = getCritMultiplierStatText(minerIndex);
-  if (ui.popupChainReactionStat) ui.popupChainReactionStat.textContent = getChainReactionStatText(minerIndex);
-  if (ui.popupSpecStatus) {
-    if (selectedSpec !== "Worker") {
-      ui.popupSpecStatus.textContent = `Specialization: ${getSpecializationLabel(selectedSpec)}`;
-    } else if (canSpec) {
-      ui.popupSpecStatus.textContent = "Class unlocked. Choose specialization";
-    } else if (canUnlockClass) {
-      ui.popupSpecStatus.textContent = `Unlock class for ${SPECIALIZATION_COST} coins`;
-    } else {
-      ui.popupSpecStatus.textContent = "Unlocks at 1.00 act/sec";
-    }
-  }
+  const specStatus = selectedSpec !== "Worker"
+    ? `Specialization: ${getSpecializationLabel(selectedSpec)}`
+    : canSpec
+    ? "Class unlocked. Choose specialization"
+    : canUnlockClass
+    ? `Unlock class for ${SPECIALIZATION_COST} coins`
+    : "Unlocks at 1.00 act/sec";
 
-  if (ui.popupUnlockClass) {
-    ui.popupUnlockClass.classList.toggle("hidden", !canUnlockClass);
-    ui.popupUnlockClass.disabled = !canUnlockClass || !specAffordable;
-  }
-  if (ui.popupChooseClass) {
-    ui.popupChooseClass.classList.toggle("hidden", !canSpec);
-    ui.popupChooseClass.disabled = !canSpec;
-  }
-
-  if (ui.popupTargetingRandom) {
-    ui.popupTargetingRandom.disabled = upgrade.targeting === "random";
-  }
-  if (ui.popupTargetingHigh) {
-    ui.popupTargetingHigh.disabled = upgrade.targeting === "high-quality";
-  }
-  if (ui.popupTargetingLow) {
-    ui.popupTargetingLow.disabled = upgrade.targeting === "low-quality";
-  }
-
-  if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.classList.toggle("hidden", !showDoubleActivation);
-  if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.classList.toggle("hidden", !showDoubleActivation);
-  if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.classList.toggle("hidden", !showVeinFinder);
-  if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.classList.toggle("hidden", !showCrit);
-  if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.classList.toggle("hidden", !showCrit);
-  if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.classList.toggle("hidden", !showChainLightning);
-
-  if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !canAfford(speedCost);
-  if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !canAfford(radiusCost);
-  if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !canAfford(doubleActivationMinCost) || !canUseClass(minerIndex, "Multi Activator");
-  if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.disabled = !canAfford(doubleActivationMaxCost) || !canUseClass(minerIndex, "Multi Activator");
-  if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.disabled = !canAfford(veinFinderCost) || !canUseClass(minerIndex, "Prospector");
-  if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.disabled = !canAfford(critChanceCost) || !canUseClass(minerIndex, "Crit Build");
-  if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.disabled = !canAfford(critMultiplierCost) || !canUseClass(minerIndex, "Crit Build");
-  if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.disabled = !canAfford(chainReactionCost) || !canUseClass(minerIndex, "Chain Lightning");
-  if (ui.popupReposition) ui.popupReposition.textContent = interactionState.placementMode ? "Click map to place…" : "Reposition";
+  renderMinerPopupView(ui, {
+    isVisible: interactionState.upgradePanelOpen,
+    title: getMinerDisplayName(minerIndex),
+    speedLevel: upgrade.speedLevel,
+    radiusLevel: upgrade.radiusLevel,
+    doubleActivationMinLevel: multiData?.multiActivationMinLevel ?? 0,
+    doubleActivationMaxLevel: multiData?.multiActivationMaxLevel ?? 0,
+    veinFinderLevel: prospectorData?.veinFinderLevel ?? 0,
+    critChanceLevel: critData?.critChanceLevel ?? 0,
+    critMultiplierLevel: critData?.critMultiplierLevel ?? 0,
+    chainReactionLevel: chainData?.chainReactionLevel ?? 0,
+    speedCost,
+    radiusCost,
+    doubleActivationMinCost,
+    doubleActivationMaxCost,
+    veinFinderCost,
+    critChanceCost,
+    critMultiplierCost,
+    chainReactionCost,
+    speedStat: getMinerSpeedStatText(minerIndex),
+    radiusStat: getMinerRadiusStatText(minerIndex),
+    doubleActivationMinStat: getDoubleActivationMinStatText(minerIndex),
+    doubleActivationMaxStat: getDoubleActivationMaxStatText(minerIndex),
+    veinFinderStat: getVeinFinderStatText(minerIndex),
+    critChanceStat: getCritChanceStatText(minerIndex),
+    critMultiplierStat: getCritMultiplierStatText(minerIndex),
+    chainReactionStat: getChainReactionStatText(minerIndex),
+    specStatus,
+    canUnlockClass,
+    specAffordable,
+    canChooseClass: canSpec,
+    targeting: upgrade.targeting,
+    showDoubleActivation,
+    showVeinFinder,
+    showCrit,
+    showChainLightning,
+    canBuySpeed: canAfford(speedCost),
+    canBuyRadius: canAfford(radiusCost),
+    canBuyDoubleActivationMin: canAfford(doubleActivationMinCost) && canUseClass(minerIndex, "Multi Activator"),
+    canBuyDoubleActivationMax: canAfford(doubleActivationMaxCost) && canUseClass(minerIndex, "Multi Activator"),
+    canBuyVeinFinder: canAfford(veinFinderCost) && canUseClass(minerIndex, "Prospector"),
+    canBuyCritChance: canAfford(critChanceCost) && canUseClass(minerIndex, "Crit Build"),
+    canBuyCritMultiplier: canAfford(critMultiplierCost) && canUseClass(minerIndex, "Crit Build"),
+    canBuyChainReaction: canAfford(chainReactionCost) && canUseClass(minerIndex, "Chain Lightning"),
+    placementMode: interactionState.placementMode,
+  });
 }
 
 function renderMinerStatsPanel(): void {
-  if (!ui.minerStatsPanel) return;
   const minerIndex = interactionState.selectedMinerIndex;
-  if (!interactionState.statsPanelOpen || minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
-    ui.minerStatsPanel.classList.add("hidden");
+  if (minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+    renderMinerStatsPanelView(ui, {
+      isVisible: false,
+      title: "",
+      positionText: "",
+      rateText: "",
+      cooldownText: "",
+      radiusText: "",
+      speedLevel: 0,
+      radiusLevel: 0,
+      doubleActivationRangeText: "",
+    });
     return;
   }
 
@@ -1846,83 +1600,34 @@ function renderMinerStatsPanel(): void {
   const minPercent = Math.round(getDoubleActivationMinPercent(minerIndex) * 100);
   const maxPercent = Math.round(getDoubleActivationMaxPercent(minerIndex) * 100);
 
-  ui.minerStatsPanel.classList.remove("hidden");
-  if (ui.minerStatsTitle) ui.minerStatsTitle.textContent = `${getMinerDisplayName(minerIndex)} Stats`;
-  if (ui.statsMinerPosition) ui.statsMinerPosition.textContent = `${Math.round(position.x)}, ${Math.round(position.y)}`;
-  if (ui.statsMinerRate) ui.statsMinerRate.textContent = `${clicksPerSecond.toFixed(2)} act/sec`;
-  if (ui.statsMinerCooldown) ui.statsMinerCooldown.textContent = `${cooldownSeconds.toFixed(2)}s`;
-  if (ui.statsMinerRadius) ui.statsMinerRadius.textContent = `${Math.round(radiusPx)}px`;
-  if (ui.statsMinerSpeedLevel) ui.statsMinerSpeedLevel.textContent = upgrade.speedLevel.toString();
-  if (ui.statsMinerRadiusLevel) ui.statsMinerRadiusLevel.textContent = upgrade.radiusLevel.toString();
-  if (ui.statsDoubleActivationRange) ui.statsDoubleActivationRange.textContent = `${minPercent}%-${maxPercent}%`;
+  renderMinerStatsPanelView(ui, {
+    isVisible: interactionState.statsPanelOpen,
+    title: `${getMinerDisplayName(minerIndex)} Stats`,
+    positionText: `${Math.round(position.x)}, ${Math.round(position.y)}`,
+    rateText: `${clicksPerSecond.toFixed(2)} act/sec`,
+    cooldownText: `${cooldownSeconds.toFixed(2)}s`,
+    radiusText: `${Math.round(radiusPx)}px`,
+    speedLevel: upgrade.speedLevel,
+    radiusLevel: upgrade.radiusLevel,
+    doubleActivationRangeText: `${minPercent}%-${maxPercent}%`,
+  });
 }
 
 function runIdleMiners(deltaSeconds: number): void {
-  if (state.idleMinerOwned <= 0) {
-    state.idleMinerCooldowns = [];
-    return;
-  }
-
-  syncIdleMinerState();
-  let activations = 0;
-  const maxTriggersPerMinerPerTick = 25;
-  const mapSize = getMapSize();
-
-  for (let minerIndex = 0; minerIndex < state.idleMinerCooldowns.length; minerIndex += 1) {
-    const cooldown = getMinerCooldownSeconds(minerIndex);
-    if (!Number.isFinite(cooldown) || cooldown <= 0) {
-      continue;
-    }
-
-    state.idleMinerCooldowns[minerIndex] -= deltaSeconds;
-    let triggerCount = 0;
-
-    while (state.idleMinerCooldowns[minerIndex] <= 0 && triggerCount < maxTriggersPerMinerPerTick) {
-      state.idleMinerCooldowns[minerIndex] += cooldown;
-      triggerCount += 1;
-
-      if (!ui.mapGrid) continue;
-      const availableTiles = Array.from(ui.mapGrid.querySelectorAll(".map-tile:not(.map-tile--cooldown)")) as HTMLElement[];
-      if (availableTiles.length === 0) {
-        continue;
-      }
-
-      const eligibleTiles = getEligibleTilesForMiner(minerIndex, availableTiles, mapSize);
-      if (eligibleTiles.length === 0) {
-        continue;
-      }
-
-      const tile = chooseTargetTile(minerIndex, eligibleTiles);
-      if (activateTile(tile, false, minerIndex)) {
-        activations += 1;
-        activations += triggerChainReaction(minerIndex, tile, mapSize);
-
-        // Double activation: always roll within min/max range
-        const roll = rollDoubleActivation(minerIndex);
-        const bonusActivations = getActivationCountFromRoll(roll);
-
-        // Activate bonus tiles
-        for (let i = 0; i < bonusActivations; i++) {
-          const bonusTiles = getEligibleTilesForMiner(
-            minerIndex,
-            availableTiles,
-            mapSize
-          );
-          if (bonusTiles.length > 0) {
-            const randomBonusIndex = Math.floor(Math.random() * bonusTiles.length);
-            if (activateTile(bonusTiles[randomBonusIndex], false, minerIndex)) {
-              activations += 1;
-              activations += triggerChainReaction(minerIndex, bonusTiles[randomBonusIndex], mapSize);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (activations > 0) {
-    render();
-  }
+  runIdleMinersLoop(deltaSeconds, {
+    state,
+    mapGrid: ui.mapGrid,
+    syncIdleMinerState,
+    getMapSize,
+    getMinerCooldownSeconds,
+    getEligibleTilesForMiner,
+    chooseTargetTile,
+    activateTile,
+    triggerChainReaction,
+    rollDoubleActivation,
+    getActivationCountFromRoll,
+    render,
+  });
 }
 
 function render(): void {
@@ -1938,16 +1643,16 @@ function render(): void {
   const goldCost = getOreGenerationCost("gold");
   const mapSize = getMapSize();
 
-  if (!interactionState.oreCopperRevealed && getOreGenerationLevel("coal") > 0 && state.coins >= copperCost / 2) {
+  if (!interactionState.oreCopperRevealed && shouldRevealNextOre(getOreGenerationLevel("coal"), state.coins, copperCost)) {
     interactionState.oreCopperRevealed = true;
   }
-  if (!interactionState.oreIronRevealed && getOreGenerationLevel("copper") > 0 && state.coins >= ironCost / 2) {
+  if (!interactionState.oreIronRevealed && shouldRevealNextOre(getOreGenerationLevel("copper"), state.coins, ironCost)) {
     interactionState.oreIronRevealed = true;
   }
-  if (!interactionState.oreSilverRevealed && getOreGenerationLevel("iron") > 0 && state.coins >= silverCost / 2) {
+  if (!interactionState.oreSilverRevealed && shouldRevealNextOre(getOreGenerationLevel("iron"), state.coins, silverCost)) {
     interactionState.oreSilverRevealed = true;
   }
-  if (!interactionState.oreGoldRevealed && getOreGenerationLevel("silver") > 0 && state.coins >= goldCost / 2) {
+  if (!interactionState.oreGoldRevealed && shouldRevealNextOre(getOreGenerationLevel("silver"), state.coins, goldCost)) {
     interactionState.oreGoldRevealed = true;
   }
 
@@ -2002,227 +1707,46 @@ function gameLoop(): void {
   render();
 }
 
-// Event listeners
-if (ui.settingsToggle) {
-  ui.settingsToggle.addEventListener("click", () => {
-    if (!ui.settingsModal) return;
-    const isHidden = ui.settingsModal.classList.contains("hidden");
-    setSettingsModalOpen(isHidden);
-  });
-}
-
-if (ui.settingsModal) {
-  ui.settingsModal.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement | null;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-    if (target.closest(".modal-card")) {
-      return;
-    }
-    setSettingsModalOpen(false);
-  });
-}
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    setSettingsModalOpen(false);
-    closeMinerPanels();
-    closeResourceStatsPanel();
-    setClassModalOpen(false);
-  }
+bindUiEvents({
+  ui,
+  state,
+  interactionState,
+  setSettingsModalOpen,
+  closeMinerPanels,
+  closeResourceStatsPanel,
+  setClassModalOpen,
+  activateTile: (tile) => {
+    activateTile(tile);
+  },
+  openMinerPanels,
+  moveMinerToPointer,
+  render,
+  buyMinerSpeedUpgrade,
+  buyMinerRadiusUpgrade,
+  toggleMinerRepositionMode,
+  closeMinerUpgradePanel,
+  closeMinerStatsPanel,
+  toggleUpgradesAccordion,
+  toggleResourceStatsPanel,
+  buyIdleMiner,
+  buyMapExpansion,
+  buyCoalGeneration,
+  buyCopperGeneration,
+  buyIronGeneration,
+  buySilverGeneration,
+  buyGoldGeneration,
+  buyDoubleActivationMin,
+  buyDoubleActivationMax,
+  buyVeinFinderUpgrade,
+  buyCritChanceUpgrade,
+  buyCritMultiplierUpgrade,
+  buyChainReactionUpgrade,
+  unlockClassChoice,
+  selectMinerSpecialization,
+  setMinerTargeting,
+  saveGame,
+  resetGame,
 });
-
-const handleMapInteract = (event: PointerEvent): void => {
-  const target = event.target as HTMLElement | null;
-  if (!(target instanceof HTMLElement)) {
-    return;
-  }
-  event.preventDefault();
-
-  // During placement mode, clicking finalizes the placement
-  if (interactionState.placementMode && interactionState.selectedMinerIndex !== null) {
-    // Position was already updated by pointermove, just finalize
-    return;
-  }
-
-  // Normal tile activation
-  if (!target.classList.contains("map-tile")) {
-    return;
-  }
-  activateTile(target);
-};
-
-if (ui.mapGrid) {
-  ui.mapGrid.addEventListener("pointerdown", handleMapInteract);
-}
-
-if (ui.minerRing) {
-  ui.minerRing.addEventListener("pointerdown", (event) => {
-    const target = event.target as HTMLElement | null;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-
-    const node = target.closest(".miner-node") as HTMLElement | null;
-    if (!(node instanceof HTMLElement)) {
-      return;
-    }
-
-    const minerIndex = Number(node.dataset.minerIndex);
-    if (!Number.isInteger(minerIndex) || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
-      return;
-    }
-
-    event.preventDefault();
-
-    openMinerPanels(minerIndex);
-  });
-}
-
-window.addEventListener("pointermove", (event) => {
-  if (!interactionState.placementMode || interactionState.selectedMinerIndex === null || !ui.mapEnvironment) {
-    return;
-  }
-
-  const envBounds = ui.mapEnvironment.getBoundingClientRect();
-  const cursorX = event.clientX - envBounds.left - envBounds.width / 2;
-  const cursorY = event.clientY - envBounds.top - envBounds.height / 2;
-  const minerIndex = interactionState.selectedMinerIndex;
-
-  state.idleMinerPositions[minerIndex] = { x: cursorX, y: cursorY };
-  renderMinerRing();
-});
-
-window.addEventListener("pointerup", () => {
-  if (interactionState.placementMode && interactionState.selectedMinerIndex !== null) {
-    interactionState.placementMode = false;
-    render();
-  }
-});
-
-if (ui.mapEnvironment) {
-  ui.mapEnvironment.addEventListener("pointerdown", (event) => {
-    const target = event.target as HTMLElement | null;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-    // Don't close the popup when interacting with map tiles
-    // The popup persists until X is clicked or another miner is selected
-  });
-}
-
-if (ui.popupUpgradeSpeed) {
-  ui.popupUpgradeSpeed.addEventListener("click", buyMinerSpeedUpgrade);
-}
-if (ui.popupUpgradeRadius) {
-  ui.popupUpgradeRadius.addEventListener("click", buyMinerRadiusUpgrade);
-}
-if (ui.popupReposition) {
-  ui.popupReposition.addEventListener("click", toggleMinerRepositionMode);
-}
-if (ui.closeMinerPopupButton) {
-  ui.closeMinerPopupButton.addEventListener("click", closeMinerUpgradePanel);
-}
-if (ui.closeMinerStatsButton) {
-  ui.closeMinerStatsButton.addEventListener("click", closeMinerStatsPanel);
-}
-if (ui.toggleUpgradesAccordion) {
-  ui.toggleUpgradesAccordion.addEventListener("click", toggleUpgradesAccordion);
-}
-if (ui.resourceStatsToggle) {
-  ui.resourceStatsToggle.addEventListener("click", toggleResourceStatsPanel);
-}
-if (ui.closeResourceStatsButton) {
-  ui.closeResourceStatsButton.addEventListener("click", closeResourceStatsPanel);
-}
-if (ui.buyIdleMiner) {
-  ui.buyIdleMiner.addEventListener("click", buyIdleMiner);
-}
-if (ui.expandMap) {
-  ui.expandMap.addEventListener("click", buyMapExpansion);
-}
-if (ui.buyCoalGeneration) {
-  ui.buyCoalGeneration.addEventListener("click", buyCoalGeneration);
-}
-if (ui.buyCopperGeneration) {
-  ui.buyCopperGeneration.addEventListener("click", buyCopperGeneration);
-}
-if (ui.buyIronGeneration) {
-  ui.buyIronGeneration.addEventListener("click", buyIronGeneration);
-}
-if (ui.buySilverGeneration) {
-  ui.buySilverGeneration.addEventListener("click", buySilverGeneration);
-}
-if (ui.buyGoldGeneration) {
-  ui.buyGoldGeneration.addEventListener("click", buyGoldGeneration);
-}
-if (ui.popupUpgradeDoubleActivationMin) {
-  ui.popupUpgradeDoubleActivationMin.addEventListener("click", buyDoubleActivationMin);
-}
-if (ui.popupUpgradeDoubleActivationMax) {
-  ui.popupUpgradeDoubleActivationMax.addEventListener("click", buyDoubleActivationMax);
-}
-if (ui.popupUpgradeVeinFinder) {
-  ui.popupUpgradeVeinFinder.addEventListener("click", buyVeinFinderUpgrade);
-}
-if (ui.popupUpgradeCritChance) {
-  ui.popupUpgradeCritChance.addEventListener("click", buyCritChanceUpgrade);
-}
-if (ui.popupUpgradeCritMultiplier) {
-  ui.popupUpgradeCritMultiplier.addEventListener("click", buyCritMultiplierUpgrade);
-}
-if (ui.popupUpgradeChainReaction) {
-  ui.popupUpgradeChainReaction.addEventListener("click", buyChainReactionUpgrade);
-}
-if (ui.popupUnlockClass) {
-  ui.popupUnlockClass.addEventListener("click", unlockClassChoice);
-}
-if (ui.popupChooseClass) {
-  ui.popupChooseClass.addEventListener("click", () => setClassModalOpen(true));
-}
-if (ui.classPickVeinFinder) {
-  ui.classPickVeinFinder.addEventListener("click", () => selectMinerSpecialization("Prospector"));
-}
-if (ui.classPickCrit) {
-  ui.classPickCrit.addEventListener("click", () => selectMinerSpecialization("Crit Build"));
-}
-if (ui.classPickChainLightning) {
-  ui.classPickChainLightning.addEventListener("click", () => selectMinerSpecialization("Chain Lightning"));
-}
-if (ui.classPickDoubleActivation) {
-  ui.classPickDoubleActivation.addEventListener("click", () => selectMinerSpecialization("Multi Activator"));
-}
-if (ui.classModalClose) {
-  ui.classModalClose.addEventListener("click", () => setClassModalOpen(false));
-}
-if (ui.classModal) {
-  ui.classModal.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement | null;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-    if (target.closest(".modal-card")) {
-      return;
-    }
-    setClassModalOpen(false);
-  });
-}
-if (ui.popupTargetingRandom) {
-  ui.popupTargetingRandom.addEventListener("click", () => setMinerTargeting("random"));
-}
-if (ui.popupTargetingHigh) {
-  ui.popupTargetingHigh.addEventListener("click", () => setMinerTargeting("high-quality"));
-}
-if (ui.popupTargetingLow) {
-  ui.popupTargetingLow.addEventListener("click", () => setMinerTargeting("low-quality"));
-}
-if (ui.save) {
-  ui.save.addEventListener("click", () => saveGame(true));
-}
-if (ui.reset) {
-  ui.reset.addEventListener("click", resetGame);
-}
 
 loadGame();
 state.lastTick = Date.now();
