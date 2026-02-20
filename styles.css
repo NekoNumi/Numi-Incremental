@@ -152,11 +152,24 @@ strong {
 .map {
   display: grid;
   gap: 0.75rem;
-  justify-items: center;
+  justify-items: stretch;
 }
 
 .map-meta {
   opacity: 0.85;
+}
+
+.map-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.map-main {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: center;
+  flex: 1;
 }
 
 .map-environment {
@@ -179,6 +192,35 @@ strong {
 
 .miner-popup.hidden {
   display: none !important;
+}
+
+.miner-stats-panel {
+  width: 240px;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border: 1px solid rgb(156 181 235 / 20%);
+  border-radius: 10px;
+  background: rgb(23 33 53 / 70%);
+}
+
+.miner-stats-panel.hidden {
+  display: none !important;
+}
+
+.miner-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.miner-stat-row span {
+  opacity: 0.8;
+}
+
+.miner-stat-row strong {
+  font-size: 0.9rem;
 }
 
 .miner-popup-header {
@@ -348,6 +390,14 @@ button:disabled {
 @media (max-width: 860px) {
   .content-layout {
     grid-template-columns: 1fr;
+  }
+
+  .map-body {
+    flex-direction: column;
+  }
+
+  .miner-stats-panel {
+    width: 100%;
   }
 
   .topbar {

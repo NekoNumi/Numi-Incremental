@@ -27,10 +27,28 @@
       <section class="content-layout">
         <section class="panel map" aria-label="Map">
           <h2>Map</h2>
-          <p class="map-meta">Size: <strong id="map-size">1x1</strong></p>
-          <div id="map-environment" class="map-environment">
-            <div id="miner-ring" class="miner-ring" aria-label="Idle miners and cooldowns"></div>
-            <div id="map-grid" class="map-grid" role="button" aria-label="Sandy map, click tiles to gather coins"></div>
+          <div class="map-body">
+            <section id="miner-stats-panel" class="miner-stats-panel hidden" aria-label="Miner stats">
+              <div class="miner-popup-header">
+                <h3 id="miner-stats-title">Miner Stats</h3>
+                <button id="close-miner-stats" class="close-button" aria-label="Close miner stats">✕</button>
+              </div>
+              <p class="miner-stat-row"><span>Position</span><strong id="stats-miner-position">0, 0</strong></p>
+              <p class="miner-stat-row"><span>Rate</span><strong id="stats-miner-rate">0.00 act/sec</strong></p>
+              <p class="miner-stat-row"><span>Cooldown</span><strong id="stats-miner-cooldown">0.00s</strong></p>
+              <p class="miner-stat-row"><span>Radius</span><strong id="stats-miner-radius">0px</strong></p>
+              <p class="miner-stat-row"><span>Speed Lvl</span><strong id="stats-miner-speed-level">0</strong></p>
+              <p class="miner-stat-row"><span>Radius Lvl</span><strong id="stats-miner-radius-level">0</strong></p>
+              <p class="miner-stat-row"><span>DA Range</span><strong id="stats-double-activation-range">0%-0%</strong></p>
+            </section>
+
+            <div class="map-main">
+              <p class="map-meta">Size: <strong id="map-size">1x1</strong></p>
+              <div id="map-environment" class="map-environment">
+                <div id="miner-ring" class="miner-ring" aria-label="Idle miners and cooldowns"></div>
+                <div id="map-grid" class="map-grid" role="button" aria-label="Sandy map, click tiles to gather coins"></div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -50,7 +68,7 @@
 
           <button id="buy-coal-generation" class="upgrade">
             <span>Coal Generation</span>
-            <small>5% + 2.5% per level chance for coal tiles → 3 coins • Cost: <span id="coal-generation-cost">75</span></small>
+            <small id="coal-generation-stat">5% + 2.5% per level chance for coal tiles → 3 coins • Cost: <span id="coal-generation-cost">75</span></small>
             <strong>Level: <span id="coal-generation-level">0</span></strong>
           </button>
 
@@ -61,13 +79,23 @@
             </div>
             <button id="popup-upgrade-speed" class="upgrade">
               <span>Faster Miner</span>
-              <small>+0.1 activations/sec • Cost: <span id="popup-speed-cost">0</span></small>
+              <small id="popup-speed-stat">+0.1 activations/sec • Cost: <span id="popup-speed-cost">0</span></small>
               <strong>Level: <span id="popup-speed-level">0</span></strong>
             </button>
             <button id="popup-upgrade-radius" class="upgrade">
               <span>Wider Mining Radius</span>
-              <small>+20% mining area • Cost: <span id="popup-radius-cost">0</span></small>
+              <small id="popup-radius-stat">+20% mining area • Cost: <span id="popup-radius-cost">0</span></small>
               <strong>Level: <span id="popup-radius-level">0</span></strong>
+            </button>
+            <button id="popup-upgrade-double-activation-min" class="upgrade">
+              <span>Double Activation (Min)</span>
+              <small id="popup-double-activation-min-stat">+5% per level to minimum activation range • Cost: <span id="popup-double-activation-min-cost">0</span></small>
+              <strong>Level: <span id="popup-double-activation-min-level">0</span></strong>
+            </button>
+            <button id="popup-upgrade-double-activation-max" class="upgrade">
+              <span>Double Activation (Max)</span>
+              <small id="popup-double-activation-max-stat">+10% per level to maximum activation range • Cost: <span id="popup-double-activation-max-cost">0</span></small>
+              <strong>Level: <span id="popup-double-activation-max-level">0</span></strong>
             </button>
             <button id="popup-reposition">Reposition</button>
           </section>

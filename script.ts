@@ -36,6 +36,8 @@ interface GameState {
   idleMinerOwned: number;
   mapExpansions: number;
   coalGenerationLevel: number;
+  doubleActivationMinLevel: number;
+  doubleActivationMaxLevel: number;
   lastTick: number;
   lastRenderedMapSize: number;
   idleMinerCooldowns: number[];
@@ -48,6 +50,8 @@ interface InteractionState {
   selectedMinerIndex: number | null;
   repositionMode: boolean;
   placementMode: boolean;
+  upgradePanelOpen: boolean;
+  statsPanelOpen: boolean;
 }
 
 interface UIElements {
@@ -79,8 +83,29 @@ interface UIElements {
   popupReposition: HTMLButtonElement | null;
   coalGenerationCost: HTMLElement | null;
   coalGenerationLevel: HTMLElement | null;
+  coalGenerationStat: HTMLElement | null;
   buyCoalGeneration: HTMLButtonElement | null;
   closeMinerPopupButton: HTMLButtonElement | null;
+  popupSpeedStat: HTMLElement | null;
+  popupRadiusStat: HTMLElement | null;
+  popupUpgradeDoubleActivationMin: HTMLButtonElement | null;
+  popupDoubleActivationMinCost: HTMLElement | null;
+  popupDoubleActivationMinLevel: HTMLElement | null;
+  popupDoubleActivationMinStat: HTMLElement | null;
+  popupUpgradeDoubleActivationMax: HTMLButtonElement | null;
+  popupDoubleActivationMaxCost: HTMLElement | null;
+  popupDoubleActivationMaxLevel: HTMLElement | null;
+  popupDoubleActivationMaxStat: HTMLElement | null;
+  minerStatsPanel: HTMLElement | null;
+  minerStatsTitle: HTMLElement | null;
+  closeMinerStatsButton: HTMLButtonElement | null;
+  statsMinerPosition: HTMLElement | null;
+  statsMinerRate: HTMLElement | null;
+  statsMinerCooldown: HTMLElement | null;
+  statsMinerRadius: HTMLElement | null;
+  statsMinerSpeedLevel: HTMLElement | null;
+  statsMinerRadiusLevel: HTMLElement | null;
+  statsDoubleActivationRange: HTMLElement | null;
 }
 
 // State
@@ -89,6 +114,8 @@ const state: GameState = {
   idleMinerOwned: 0,
   mapExpansions: 0,
   coalGenerationLevel: 0,
+  doubleActivationMinLevel: 0,
+  doubleActivationMaxLevel: 0,
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
   idleMinerCooldowns: [],
@@ -101,6 +128,8 @@ const interactionState: InteractionState = {
   selectedMinerIndex: null,
   repositionMode: false,
   placementMode: false,
+  upgradePanelOpen: false,
+  statsPanelOpen: false,
 };
 
 const idleMiner: UpgradeConfig = {
@@ -125,6 +154,16 @@ const coalGenerationUpgrade: UpgradeConfig = {
   baseCost: 75,
   growth: 1.25,
   bonusClicksPerSecond: 0.05,
+};
+
+const doubleActivationMinUpgrade: UpgradeConfig = {
+  baseCost: 80,
+  growth: 1.2,
+};
+
+const doubleActivationMaxUpgrade: UpgradeConfig = {
+  baseCost: 100,
+  growth: 1.3,
 };
 
 // UI Element references
@@ -154,11 +193,32 @@ const ui: UIElements = {
   popupRadiusCost: document.getElementById("popup-radius-cost"),
   popupSpeedLevel: document.getElementById("popup-speed-level"),
   popupRadiusLevel: document.getElementById("popup-radius-level"),
+  popupSpeedStat: document.getElementById("popup-speed-stat"),
+  popupRadiusStat: document.getElementById("popup-radius-stat"),
   popupReposition: document.getElementById("popup-reposition") as HTMLButtonElement,
   coalGenerationCost: document.getElementById("coal-generation-cost"),
   coalGenerationLevel: document.getElementById("coal-generation-level"),
+  coalGenerationStat: document.getElementById("coal-generation-stat"),
   buyCoalGeneration: document.getElementById("buy-coal-generation") as HTMLButtonElement,
   closeMinerPopupButton: document.getElementById("close-miner-popup") as HTMLButtonElement,
+  popupUpgradeDoubleActivationMin: document.getElementById("popup-upgrade-double-activation-min") as HTMLButtonElement,
+  popupDoubleActivationMinCost: document.getElementById("popup-double-activation-min-cost"),
+  popupDoubleActivationMinLevel: document.getElementById("popup-double-activation-min-level"),
+  popupDoubleActivationMinStat: document.getElementById("popup-double-activation-min-stat"),
+  popupUpgradeDoubleActivationMax: document.getElementById("popup-upgrade-double-activation-max") as HTMLButtonElement,
+  popupDoubleActivationMaxCost: document.getElementById("popup-double-activation-max-cost"),
+  popupDoubleActivationMaxLevel: document.getElementById("popup-double-activation-max-level"),
+  popupDoubleActivationMaxStat: document.getElementById("popup-double-activation-max-stat"),
+  minerStatsPanel: document.getElementById("miner-stats-panel"),
+  minerStatsTitle: document.getElementById("miner-stats-title"),
+  closeMinerStatsButton: document.getElementById("close-miner-stats") as HTMLButtonElement,
+  statsMinerPosition: document.getElementById("stats-miner-position"),
+  statsMinerRate: document.getElementById("stats-miner-rate"),
+  statsMinerCooldown: document.getElementById("stats-miner-cooldown"),
+  statsMinerRadius: document.getElementById("stats-miner-radius"),
+  statsMinerSpeedLevel: document.getElementById("stats-miner-speed-level"),
+  statsMinerRadiusLevel: document.getElementById("stats-miner-radius-level"),
+  statsDoubleActivationRange: document.getElementById("stats-double-activation-range"),
 };
 
 // Utility functions
@@ -239,6 +299,81 @@ function getCoalSpawnChance(): number {
   return 0.05 * (1 + state.coalGenerationLevel * 0.5);
 }
 
+function getDoubleActivationMinCost(): number {
+  return getUpgradeCost(doubleActivationMinUpgrade, state.doubleActivationMinLevel);
+}
+
+function getDoubleActivationMaxCost(): number {
+  return getUpgradeCost(doubleActivationMaxUpgrade, state.doubleActivationMaxLevel);
+}
+
+function getDoubleActivationMinPercent(): number {
+  return state.doubleActivationMinLevel * 0.05;
+}
+
+function getDoubleActivationMaxPercent(): number {
+  return state.doubleActivationMaxLevel * 0.1;
+}
+
+function rollDoubleActivation(): number {
+  const minPercent = getDoubleActivationMinPercent();
+  const maxPercent = getDoubleActivationMaxPercent();
+
+  // If min > max, just use max
+  if (minPercent > maxPercent) {
+    return maxPercent;
+  }
+
+  // Roll between min and max
+  return minPercent + Math.random() * (maxPercent - minPercent);
+}
+
+function getActivationCountFromRoll(roll: number): number {
+  // roll is in decimal form (0.4 = 40%, 2.3 = 230%)
+  // For every 1.0 (100%), activate one tile
+  // For the remainder, there's a percentage chance for another
+  const fullActivations = Math.floor(roll);
+  const remainder = roll - fullActivations;
+  const extraChance = Math.random() < remainder ? 1 : 0;
+  return fullActivations + extraChance;
+}
+
+// Stat display functions for showing current vs next level
+function getCoalGenerationStatText(): string {
+  const current = 0.05 + state.coalGenerationLevel * 0.025;
+  const next = 0.05 + (state.coalGenerationLevel + 1) * 0.025;
+  return `Current: ${(current * 100).toFixed(1)}% → Upgrading to: ${(next * 100).toFixed(1)}% chance for coal tiles (3 coins)`;
+}
+
+function getMinerSpeedStatText(minerIndex: number): string {
+  const upgrade = getMinerUpgrade(minerIndex);
+  const base = 1 / (idleMiner.triggerIntervalSeconds || 5);
+  const bonus = fasterMinerUpgrade.bonusClicksPerSecond || 0.1;
+  const current = (base + upgrade.speedLevel * bonus).toFixed(2);
+  const next = (base + (upgrade.speedLevel + 1) * bonus).toFixed(2);
+  return `Current: ${current} act/sec → Upgrading to: ${next} act/sec`;
+}
+
+function getMinerRadiusStatText(minerIndex: number): string {
+  const upgrade = getMinerUpgrade(minerIndex);
+  const nextRadius = upgrade.radiusLevel + 1;
+  const currentMultiplier = (1 + upgrade.radiusLevel * 0.2).toFixed(1);
+  const nextMultiplier = (1 + nextRadius * 0.2).toFixed(1);
+  return `Current: ${currentMultiplier}x area → Upgrading to: ${nextMultiplier}x area`;
+}
+
+function getDoubleActivationMinStatText(): string {
+  const current = (state.doubleActivationMinLevel * 0.05 * 100).toFixed(0);
+  const next = ((state.doubleActivationMinLevel + 1) * 0.05 * 100).toFixed(0);
+  return `Current min: ${current}% → Upgrading to: ${next}%`;
+}
+
+function getDoubleActivationMaxStatText(): string {
+  const current = (state.doubleActivationMaxLevel * 0.1 * 100).toFixed(0);
+  const next = ((state.doubleActivationMaxLevel + 1) * 0.1 * 100).toFixed(0);
+  return `Current max: ${current}% → Upgrading to: ${next}%`;
+}
+
 function getCoinsPerSecond(): number {
   let total = 0;
   for (let minerIndex = 0; minerIndex < state.idleMinerOwned; minerIndex += 1) {
@@ -279,6 +414,8 @@ function saveGame(showStatus: boolean = true): void {
       idleMinerUpgrades: state.idleMinerUpgrades,
       mapExpansions: state.mapExpansions,
       coalGenerationLevel: state.coalGenerationLevel,
+      doubleActivationMinLevel: state.doubleActivationMinLevel,
+      doubleActivationMaxLevel: state.doubleActivationMaxLevel,
       savedAt: Date.now(),
     })
   );
@@ -312,7 +449,7 @@ function syncIdleMinerState(): void {
   }
 
   if (interactionState.selectedMinerIndex !== null && interactionState.selectedMinerIndex >= state.idleMinerOwned) {
-    closeMinerPopup();
+    closeMinerPanels();
   }
 }
 
@@ -370,6 +507,8 @@ function loadGame(): void {
 
     state.mapExpansions = Number(parsed.mapExpansions) || 0;
     state.coalGenerationLevel = Number(parsed.coalGenerationLevel) || 0;
+    state.doubleActivationMinLevel = Number(parsed.doubleActivationMinLevel) || 0;
+    state.doubleActivationMaxLevel = Number(parsed.doubleActivationMaxLevel) || 0;
     syncIdleMinerState();
 
     const now = Date.now();
@@ -461,19 +600,50 @@ function setSettingsModalOpen(isOpen: boolean): void {
   ui.settingsToggle.setAttribute("aria-expanded", String(isOpen));
 }
 
-function openMinerPopup(minerIndex: number): void {
+function openMinerPanels(minerIndex: number): void {
   interactionState.selectedMinerIndex = minerIndex;
   interactionState.repositionMode = false;
+  interactionState.upgradePanelOpen = true;
+  interactionState.statsPanelOpen = true;
+  renderMinerStatsPanel();
   renderMinerPopup();
 }
 
-function closeMinerPopup(): void {
+function closeMinerUpgradePanel(): void {
+  interactionState.upgradePanelOpen = false;
+  interactionState.repositionMode = false;
+  interactionState.placementMode = false;
+  interactionState.activeMinerIndex = null;
+  if (!interactionState.statsPanelOpen) {
+    interactionState.selectedMinerIndex = null;
+  }
+  if (ui.minerPopup) {
+    ui.minerPopup.classList.add("hidden");
+  }
+}
+
+function closeMinerStatsPanel(): void {
+  interactionState.statsPanelOpen = false;
+  if (!interactionState.upgradePanelOpen) {
+    interactionState.selectedMinerIndex = null;
+  }
+  if (ui.minerStatsPanel) {
+    ui.minerStatsPanel.classList.add("hidden");
+  }
+}
+
+function closeMinerPanels(): void {
+  interactionState.upgradePanelOpen = false;
+  interactionState.statsPanelOpen = false;
   interactionState.selectedMinerIndex = null;
   interactionState.repositionMode = false;
   interactionState.placementMode = false;
   interactionState.activeMinerIndex = null;
   if (ui.minerPopup) {
     ui.minerPopup.classList.add("hidden");
+  }
+  if (ui.minerStatsPanel) {
+    ui.minerStatsPanel.classList.add("hidden");
   }
 }
 
@@ -575,12 +745,14 @@ function resetGame(): void {
   state.idleMinerOwned = 0;
   state.mapExpansions = 0;
   state.coalGenerationLevel = 0;
+  state.doubleActivationMinLevel = 0;
+  state.doubleActivationMaxLevel = 0;
   state.lastTick = Date.now();
   state.lastRenderedMapSize = 0;
   state.idleMinerCooldowns = [];
   state.idleMinerPositions = [];
   state.idleMinerUpgrades = [];
-  closeMinerPopup();
+  closeMinerPanels();
   render();
   setSettingsModalOpen(false);
   setStatus("Progress reset.");
@@ -603,6 +775,26 @@ function buyCoalGeneration(): void {
   }
   state.coins -= cost;
   state.coalGenerationLevel += 1;
+  render();
+}
+
+function buyDoubleActivationMin(): void {
+  const cost = getDoubleActivationMinCost();
+  if (!canAfford(cost)) {
+    return;
+  }
+  state.coins -= cost;
+  state.doubleActivationMinLevel += 1;
+  render();
+}
+
+function buyDoubleActivationMax(): void {
+  const cost = getDoubleActivationMaxCost();
+  if (!canAfford(cost)) {
+    return;
+  }
+  state.coins -= cost;
+  state.doubleActivationMaxLevel += 1;
   render();
 }
 
@@ -687,7 +879,7 @@ function moveMinerToPointer(clientX: number, clientY: number): void {
 function renderMinerPopup(): void {
   if (!ui.minerPopup) return;
   const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+  if (!interactionState.upgradePanelOpen || minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
     ui.minerPopup.classList.add("hidden");
     return;
   }
@@ -695,16 +887,55 @@ function renderMinerPopup(): void {
   const upgrade = getMinerUpgrade(minerIndex);
   const speedCost = getMinerSpeedUpgradeCost(minerIndex);
   const radiusCost = getMinerRadiusUpgradeCost(minerIndex);
+  const doubleActivationMinCost = getDoubleActivationMinCost();
+  const doubleActivationMaxCost = getDoubleActivationMaxCost();
 
   ui.minerPopup.classList.remove("hidden");
   if (ui.minerPopupTitle) ui.minerPopupTitle.textContent = `Miner ${minerIndex + 1}`;
   if (ui.popupSpeedLevel) ui.popupSpeedLevel.textContent = upgrade.speedLevel.toString();
   if (ui.popupRadiusLevel) ui.popupRadiusLevel.textContent = upgrade.radiusLevel.toString();
+  if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = state.doubleActivationMinLevel.toString();
+  if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = state.doubleActivationMaxLevel.toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = radiusCost.toLocaleString();
+  if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = doubleActivationMinCost.toLocaleString();
+  if (ui.popupDoubleActivationMaxCost) ui.popupDoubleActivationMaxCost.textContent = doubleActivationMaxCost.toLocaleString();
+  if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = getMinerSpeedStatText(minerIndex) + " • Cost: " + speedCost.toLocaleString();
+  if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = getMinerRadiusStatText(minerIndex) + " • Cost: " + radiusCost.toLocaleString();
+  if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = getDoubleActivationMinStatText() + " • Cost: " + doubleActivationMinCost.toLocaleString();
+  if (ui.popupDoubleActivationMaxStat) ui.popupDoubleActivationMaxStat.textContent = getDoubleActivationMaxStatText() + " • Cost: " + doubleActivationMaxCost.toLocaleString();
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !canAfford(speedCost);
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !canAfford(radiusCost);
+  if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !canAfford(doubleActivationMinCost);
+  if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.disabled = !canAfford(doubleActivationMaxCost);
   if (ui.popupReposition) ui.popupReposition.textContent = interactionState.placementMode ? "Click map to place…" : "Reposition";
+}
+
+function renderMinerStatsPanel(): void {
+  if (!ui.minerStatsPanel) return;
+  const minerIndex = interactionState.selectedMinerIndex;
+  if (!interactionState.statsPanelOpen || minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+    ui.minerStatsPanel.classList.add("hidden");
+    return;
+  }
+
+  const upgrade = getMinerUpgrade(minerIndex);
+  const position = getMinerPosition(minerIndex);
+  const clicksPerSecond = getMinerClicksPerSecond(minerIndex);
+  const cooldownSeconds = getMinerCooldownSeconds(minerIndex);
+  const radiusPx = getMinerEffectRadiusPx(minerIndex);
+  const minPercent = Math.round(getDoubleActivationMinPercent() * 100);
+  const maxPercent = Math.round(getDoubleActivationMaxPercent() * 100);
+
+  ui.minerStatsPanel.classList.remove("hidden");
+  if (ui.minerStatsTitle) ui.minerStatsTitle.textContent = `Miner ${minerIndex + 1} Stats`;
+  if (ui.statsMinerPosition) ui.statsMinerPosition.textContent = `${Math.round(position.x)}, ${Math.round(position.y)}`;
+  if (ui.statsMinerRate) ui.statsMinerRate.textContent = `${clicksPerSecond.toFixed(2)} act/sec`;
+  if (ui.statsMinerCooldown) ui.statsMinerCooldown.textContent = `${cooldownSeconds.toFixed(2)}s`;
+  if (ui.statsMinerRadius) ui.statsMinerRadius.textContent = `${Math.round(radiusPx)}px`;
+  if (ui.statsMinerSpeedLevel) ui.statsMinerSpeedLevel.textContent = upgrade.speedLevel.toString();
+  if (ui.statsMinerRadiusLevel) ui.statsMinerRadiusLevel.textContent = upgrade.radiusLevel.toString();
+  if (ui.statsDoubleActivationRange) ui.statsDoubleActivationRange.textContent = `${minPercent}%-${maxPercent}%`;
 }
 
 function runIdleMiners(deltaSeconds: number): void {
@@ -746,6 +977,25 @@ function runIdleMiners(deltaSeconds: number): void {
       const tile = eligibleTiles[randomIndex];
       if (activateTile(tile, false)) {
         activations += 1;
+
+        // Double activation: always roll within min/max range
+        const roll = rollDoubleActivation();
+        const bonusActivations = getActivationCountFromRoll(roll);
+
+        // Activate bonus tiles
+        for (let i = 0; i < bonusActivations; i++) {
+          const bonusTiles = getEligibleTilesForMiner(
+            minerIndex,
+            availableTiles,
+            mapSize
+          );
+          if (bonusTiles.length > 0) {
+            const randomBonusIndex = Math.floor(Math.random() * bonusTiles.length);
+            if (activateTile(bonusTiles[randomBonusIndex], false)) {
+              activations += 1;
+            }
+          }
+        }
       }
     }
   }
@@ -775,10 +1025,12 @@ function render(): void {
   if (ui.expandMap) ui.expandMap.disabled = !canAfford(mapCost);
   if (ui.coalGenerationCost) ui.coalGenerationCost.textContent = coalCost.toLocaleString();
   if (ui.coalGenerationLevel) ui.coalGenerationLevel.textContent = state.coalGenerationLevel.toString();
+  if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getCoalGenerationStatText() + " • Cost: " + coalCost.toLocaleString();
   if (ui.buyCoalGeneration) ui.buyCoalGeneration.disabled = !canAfford(coalCost);
 
   renderMap();
   renderMinerRing();
+  renderMinerStatsPanel();
   renderMinerPopup();
 }
 
@@ -815,7 +1067,7 @@ if (ui.settingsModal) {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setSettingsModalOpen(false);
-    closeMinerPopup();
+    closeMinerPanels();
   }
 });
 
@@ -862,7 +1114,7 @@ if (ui.minerRing) {
 
     event.preventDefault();
 
-    openMinerPopup(minerIndex);
+    openMinerPanels(minerIndex);
   });
 }
 
@@ -908,7 +1160,10 @@ if (ui.popupReposition) {
   ui.popupReposition.addEventListener("click", toggleMinerRepositionMode);
 }
 if (ui.closeMinerPopupButton) {
-  ui.closeMinerPopupButton.addEventListener("click", closeMinerPopup);
+  ui.closeMinerPopupButton.addEventListener("click", closeMinerUpgradePanel);
+}
+if (ui.closeMinerStatsButton) {
+  ui.closeMinerStatsButton.addEventListener("click", closeMinerStatsPanel);
 }
 if (ui.buyIdleMiner) {
   ui.buyIdleMiner.addEventListener("click", buyIdleMiner);
@@ -918,6 +1173,12 @@ if (ui.expandMap) {
 }
 if (ui.buyCoalGeneration) {
   ui.buyCoalGeneration.addEventListener("click", buyCoalGeneration);
+}
+if (ui.popupUpgradeDoubleActivationMin) {
+  ui.popupUpgradeDoubleActivationMin.addEventListener("click", buyDoubleActivationMin);
+}
+if (ui.popupUpgradeDoubleActivationMax) {
+  ui.popupUpgradeDoubleActivationMax.addEventListener("click", buyDoubleActivationMax);
 }
 if (ui.save) {
   ui.save.addEventListener("click", () => saveGame(true));
