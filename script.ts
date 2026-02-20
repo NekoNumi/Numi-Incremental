@@ -38,7 +38,7 @@ interface UpgradeConfig {
   growth: number;
   bonusClicksPerSecond?: number;
   triggerIntervalSeconds?: number;
-  areaMultiplierPerLevel?: number;
+  radiusMultiplierPerLevel?: number;
 }
 
 interface GameState {
@@ -228,7 +228,7 @@ const fasterMinerUpgrade: UpgradeConfig = {
 const minerRadiusUpgrade: UpgradeConfig = {
   baseCost: 60,
   growth: 1.35,
-  areaMultiplierPerLevel: 1.2,
+  radiusMultiplierPerLevel: 1.25,
 };
 
 const coalGenerationUpgrade: UpgradeConfig = {
@@ -497,9 +497,8 @@ function getMinerRadiusUpgradeCost(minerIndex: number): number {
 
 function getMinerEffectRadiusPx(minerIndex: number): number {
   const upgrade = getMinerUpgrade(minerIndex);
-  const multiplier = minerRadiusUpgrade.areaMultiplierPerLevel || 1.2;
-  const areaMultiplier = multiplier ** upgrade.radiusLevel;
-  return BASE_MINER_EFFECT_RADIUS_PX * Math.sqrt(areaMultiplier);
+  const multiplier = minerRadiusUpgrade.radiusMultiplierPerLevel || 1.25;
+  return BASE_MINER_EFFECT_RADIUS_PX * multiplier ** upgrade.radiusLevel;
 }
 
 function getOreUpgradeConfig(ore: UpgradableOre): UpgradeConfig {
@@ -734,9 +733,10 @@ function getMinerSpeedStatText(minerIndex: number): string {
 function getMinerRadiusStatText(minerIndex: number): string {
   const upgrade = getMinerUpgrade(minerIndex);
   const nextRadius = upgrade.radiusLevel + 1;
-  const currentMultiplier = (1 + upgrade.radiusLevel * 0.2).toFixed(1);
-  const nextMultiplier = (1 + nextRadius * 0.2).toFixed(1);
-  return `Current: ${currentMultiplier}x area → Upgrading to: ${nextMultiplier}x area`;
+  const multiplier = minerRadiusUpgrade.radiusMultiplierPerLevel || 1.25;
+  const currentMultiplier = (multiplier ** upgrade.radiusLevel).toFixed(2);
+  const nextMultiplier = (multiplier ** nextRadius).toFixed(2);
+  return `Current: ${currentMultiplier}x radius → Upgrading to: ${nextMultiplier}x radius`;
 }
 
 function getDoubleActivationMinStatText(minerIndex: number): string {
