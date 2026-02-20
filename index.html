@@ -136,6 +136,27 @@
               <h3 id="miner-popup-title">Miner</h3>
               <button id="close-miner-popup" class="close-button" aria-label="Close miner panel">✕</button>
             </div>
+            <p id="popup-spec-status" class="miner-stat-row"><span>Specialization</span><strong>Unlocks at 1.00 act/sec</strong></p>
+            <div class="upgrade">
+              <div class="upgrade-header">
+                <span>Class Progression</span>
+                <strong class="upgrade-quantity">250</strong>
+              </div>
+              <small>Unlock class at 1.00 act/sec, then choose specialization</small>
+              <button id="popup-unlock-class" class="hidden">Unlock Class (250)</button>
+              <button id="popup-choose-class" class="hidden">Choose Class</button>
+            </div>
+            <div class="upgrade">
+              <div class="upgrade-header">
+                <span>Targeting</span>
+                <strong class="upgrade-quantity">Mode</strong>
+              </div>
+              <div class="upgrade-header">
+                <button id="popup-targeting-random">Random</button>
+                <button id="popup-targeting-high">High Quality</button>
+                <button id="popup-targeting-low">Low Quality</button>
+              </div>
+            </div>
             <button id="popup-upgrade-speed" class="upgrade">
               <div class="upgrade-header">
                 <span>Faster Miner</span>
@@ -176,6 +197,30 @@
               <small id="popup-vein-finder-stat">Current boost: +0% → Upgrading to: +25% for mined ore respawn weight</small>
               <span class="upgrade-cost-row">Cost: <span id="popup-vein-finder-cost">0</span></span>
             </button>
+            <button id="popup-upgrade-crit-chance" class="upgrade">
+              <div class="upgrade-header">
+                <span>Critical Strike (Chance)</span>
+                <strong class="upgrade-quantity" id="popup-crit-chance-level">0</strong>
+              </div>
+              <small id="popup-crit-chance-stat">Current chance: 0% → Upgrading to: 3%</small>
+              <span class="upgrade-cost-row">Cost: <span id="popup-crit-chance-cost">0</span></span>
+            </button>
+            <button id="popup-upgrade-crit-multiplier" class="upgrade">
+              <div class="upgrade-header">
+                <span>Critical Strike (Multiplier)</span>
+                <strong class="upgrade-quantity" id="popup-crit-multiplier-level">0</strong>
+              </div>
+              <small id="popup-crit-multiplier-stat">Current crit: 2.0x → Upgrading to: 2.2x</small>
+              <span class="upgrade-cost-row">Cost: <span id="popup-crit-multiplier-cost">0</span></span>
+            </button>
+            <button id="popup-upgrade-chain-reaction" class="upgrade">
+              <div class="upgrade-header">
+                <span>Chain Lightning</span>
+                <strong class="upgrade-quantity" id="popup-chain-reaction-level">0</strong>
+              </div>
+              <small id="popup-chain-reaction-stat">Locked. 0% chance → Unlocks 1 adjacent chain</small>
+              <span class="upgrade-cost-row">Cost: <span id="popup-chain-reaction-cost">0</span></span>
+            </button>
             <button id="popup-reposition">Reposition</button>
           </section>
         </section>
@@ -195,6 +240,36 @@
           </div>
         </header>
         <div class="modal-body"></div>
+      </div>
+    </section>
+
+    <section id="class-modal" class="modal hidden" aria-label="Choose class" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card">
+        <header class="modal-header">
+          <h2>Choose Specialization</h2>
+          <div class="modal-actions">
+            <button id="close-class-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body">
+          <button id="class-pick-vein-finder" class="upgrade">
+            <div class="upgrade-header"><span>Vein Finder</span></div>
+            <small>Boosts respawn weight of mined ore</small>
+          </button>
+          <button id="class-pick-crit" class="upgrade">
+            <div class="upgrade-header"><span>Critical Strike</span></div>
+            <small>Unlocks crit chance and crit multiplier upgrades</small>
+          </button>
+          <button id="class-pick-chain-lightning" class="upgrade">
+            <div class="upgrade-header"><span>Chain Lightning</span></div>
+            <small>10% proc with adjacent chain scaling</small>
+          </button>
+          <button id="class-pick-double-activation" class="upgrade">
+            <div class="upgrade-header"><span>Double Activation</span></div>
+            <small>Unlocks min/max extra activation range upgrades</small>
+          </button>
+        </div>
       </div>
     </section>
 
