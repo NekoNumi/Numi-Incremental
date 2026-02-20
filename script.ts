@@ -4,29 +4,25 @@ import {
   SAVE_KEY,
   SPECIALIZATION_COST,
 } from "./game-constants";
-import {
-  clamp,
-  getDefaultMinerPosition,
-  getTileBoundsByIndex,
-  getTileCoverageInMinerRadius,
-} from "./map-geometry";
+import { createGameActions } from "./game-actions";
+import { runIdleMinersLoop } from "./game-loop";
 import type {
   GameState,
   MinerTargeting,
-  OreType,
-  Position,
-  ResourceConfig,
-  Unit,
   UnitSpecialization,
   UpgradeConfig,
-  UpgradableOre,
 } from "./game-types";
-import { createDefaultResources, DEFAULT_RESOURCES } from "./resources";
+import { clamp } from "./map-geometry";
+import { createMinerActions } from "./miner-actions";
+import { createMinerLogic } from "./miner-logic";
 import { clearSavedGame, loadGameState, saveGameState } from "./persistence";
+import { createDefaultResources } from "./resources";
+import { createResourceLogic } from "./resource-logic";
 import { getChanceText, shouldRevealNextOre } from "./rendering";
-import { runIdleMinersLoop } from "./game-loop";
-import { renderResourceStatsPanelView, renderUpgradesAccordionView } from "./ui-renderers";
+import { createTileActions } from "./tile-actions";
 import { renderMinerPopupView, renderMinerStatsPanelView } from "./ui-miner-panels";
+import { createUiPanelControls } from "./ui-panel-controls";
+import { renderResourceStatsPanelView, renderUpgradesAccordionView } from "./ui-renderers";
 import { bindUiEvents } from "./ui-events";
 import {
   buildSpecializationData,
@@ -360,419 +356,85 @@ function getIdleMinerCost(): number {
   return idleMiner.baseCost * nextCount ** 3;
 }
 
-function getMinerUpgrade(minerIndex: number): Unit {
-  const unit = state.units[minerIndex];
-  if (!unit) {
-    return {
-      speedLevel: 0,
-      radiusLevel: 0,
-      specializationUnlocked: false,
-      specialization: "Worker",
-      targeting: "random",
-      specializationData: getDefaultSpecializationData("Worker"),
-    };
-  }
+const {
+  getOreGenerationLevel,
+  setOreGenerationLevel,
+  getOreGenerationCost,
+  rollTileType,
+  rollTileTypeWithBoostedOre,
+  getTileCoinValue,
+  renderResourceLegend,
+  getOreGenerationStatText,
+} = createResourceLogic({
+  state,
+  resourceLegendBody: ui.resourceLegendBody,
+  getUpgradeCost,
+  round,
+  getChanceText,
+});
 
-  const specialization = normalizeSpecialization(unit.specialization);
-  const specializationDataRaw = (unit.specializationData as Record<string, unknown> | undefined) || {};
-  const specializationData = buildSpecializationData(specializationDataRaw, specialization);
-
-  return {
-    speedLevel: Number(unit.speedLevel) || 0,
-    radiusLevel: Number(unit.radiusLevel) || 0,
-    specializationUnlocked: Boolean(unit.specializationUnlocked),
-    specialization,
-    targeting: (unit.targeting as MinerTargeting) || "random",
-    specializationData,
-  };
-}
-
-function getMinerClicksPerSecond(minerIndex: number): number {
-  const upgrade = getMinerUpgrade(minerIndex);
-  const triggerInterval = idleMiner.triggerIntervalSeconds || 5;
-  const bonus = fasterMinerUpgrade.bonusClicksPerSecond || 0.1;
-  return 1 / triggerInterval + upgrade.speedLevel * bonus;
-}
-
-function getMinerCooldownSeconds(minerIndex: number): number {
-  const clicksPerSecond = getMinerClicksPerSecond(minerIndex);
-  if (clicksPerSecond <= 0) {
-    return Infinity;
-  }
-  return 1 / clicksPerSecond;
-}
-
-function getMinerSpeedUpgradeCost(minerIndex: number): number {
-  const upgrade = getMinerUpgrade(minerIndex);
-  return getUpgradeCost(fasterMinerUpgrade, upgrade.speedLevel);
-}
-
-function getMinerRadiusUpgradeCost(minerIndex: number): number {
-  const upgrade = getMinerUpgrade(minerIndex);
-  return getUpgradeCost(minerRadiusUpgrade, upgrade.radiusLevel);
-}
-
-function getMinerEffectRadiusPx(minerIndex: number): number {
-  const upgrade = getMinerUpgrade(minerIndex);
-  const multiplier = minerRadiusUpgrade.radiusMultiplierPerLevel || 1.25;
-  return BASE_MINER_EFFECT_RADIUS_PX * multiplier ** upgrade.radiusLevel;
-}
-
-function getOreUpgradeConfig(ore: UpgradableOre): UpgradeConfig {
-  const resource = state.resources.find((entry) => entry.ore === ore);
-  return {
-    baseCost: resource?.baseCost || 0,
-    growth: resource?.growth || 1,
-  };
-}
-
-function getResourceByOre(ore: OreType): ResourceConfig {
-  const resource = state.resources.find((entry) => entry.ore === ore);
-  if (resource) {
-    return resource;
-  }
-  const fallback = DEFAULT_RESOURCES.find((entry) => entry.ore === ore);
-  if (fallback) {
-    return { ...fallback };
-  }
-  return { ore, name: ore.charAt(0).toUpperCase() + ore.slice(1), weight: 0, value: 1, baseCost: 0, growth: 1, resourceLevel: 0 };
-}
-
-function getOreGenerationLevel(ore: UpgradableOre): number {
-  return getResourceByOre(ore).resourceLevel;
-}
-
-function setOreGenerationLevel(ore: UpgradableOre, level: number): void {
-  const resource = state.resources.find((entry) => entry.ore === ore);
-  if (resource) {
-    resource.resourceLevel = Math.max(0, level);
-  }
-}
-
-function getOreWeightForLevel(ore: OreType, level: number): number {
-  const baseWeight = getResourceByOre(ore).weight;
-  if (ore === "sand") {
-    return baseWeight;
-  }
-  if (level <= 0) {
-    return 0;
-  }
-  return baseWeight * 1.2 ** (level - 1);
-}
-
-function getOreGenerationCost(ore: UpgradableOre): number {
-  return getUpgradeCost(getOreUpgradeConfig(ore), getOreGenerationLevel(ore));
-}
-
-function getOreEffectiveWeight(ore: OreType): number {
-  const level = ore === "sand" ? 1 : getOreGenerationLevel(ore);
-  return getOreWeightForLevel(ore, level);
-}
-
-function rollTileType(): OreType {
-  const weights: Array<{ ore: OreType; weight: number }> = [
-    { ore: "sand", weight: getOreEffectiveWeight("sand") },
-    { ore: "coal", weight: getOreEffectiveWeight("coal") },
-    { ore: "copper", weight: getOreEffectiveWeight("copper") },
-    { ore: "iron", weight: getOreEffectiveWeight("iron") },
-    { ore: "silver", weight: getOreEffectiveWeight("silver") },
-    { ore: "gold", weight: getOreEffectiveWeight("gold") },
-  ];
-
-  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
-  let roll = Math.random() * totalWeight;
-
-  for (const entry of weights) {
-    roll -= entry.weight;
-    if (roll <= 0) {
-      return entry.ore;
-    }
-  }
-
-  return "sand";
-}
-
-function rollTileTypeWithBoostedOre(boostedOre: UpgradableOre, qualityMultiplier: number): OreType {
-  const weights: Array<{ ore: OreType; weight: number }> = [
-    { ore: "sand", weight: getOreEffectiveWeight("sand") },
-    { ore: "coal", weight: getOreEffectiveWeight("coal") },
-    { ore: "copper", weight: getOreEffectiveWeight("copper") },
-    { ore: "iron", weight: getOreEffectiveWeight("iron") },
-    { ore: "silver", weight: getOreEffectiveWeight("silver") },
-    { ore: "gold", weight: getOreEffectiveWeight("gold") },
-  ];
-
-  for (const entry of weights) {
-    if (entry.ore === boostedOre) {
-      entry.weight *= qualityMultiplier;
-      break;
-    }
-  }
-
-  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
-  let roll = Math.random() * totalWeight;
-
-  for (const entry of weights) {
-    roll -= entry.weight;
-    if (roll <= 0) {
-      return entry.ore;
-    }
-  }
-
-  return "sand";
-}
-
-function getTileCoinValue(tileType: OreType): number {
-  return getResourceByOre(tileType).value || 1;
-}
-
-function getOreDisplayName(ore: OreType): string {
-  return getResourceByOre(ore).name;
-}
-
-function renderResourceLegend(): void {
-  if (!ui.resourceLegendBody) {
-    return;
-  }
-
-  const weights = state.resources.map((resource) => ({ ore: resource.ore, weight: getOreEffectiveWeight(resource.ore) }));
-  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
-
-  ui.resourceLegendBody.innerHTML = weights
-    .map(({ ore, weight }) => {
-      const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
-      const chanceText = getChanceText(chancePercent);
-      return `<p class="resource-legend-row"><span>${getOreDisplayName(ore)}</span><span>${chanceText}%</span><span>${getTileCoinValue(ore)}</span></p>`;
-    })
-    .join("");
-}
-
-function getDoubleActivationMinCost(minerIndex: number): number {
-  const unit = getMinerUpgrade(minerIndex);
-  const level = unit.specializationData.type === "Multi Activator" ? unit.specializationData.multiActivationMinLevel : 0;
-  return getUpgradeCost(doubleActivationMinUpgrade, level);
-}
-
-function getDoubleActivationMaxCost(minerIndex: number): number {
-  const unit = getMinerUpgrade(minerIndex);
-  const level = unit.specializationData.type === "Multi Activator" ? unit.specializationData.multiActivationMaxLevel : 0;
-  return getUpgradeCost(doubleActivationMaxUpgrade, level);
-}
-
-function getVeinFinderCost(minerIndex: number): number {
-  const unit = getMinerUpgrade(minerIndex);
-  const level = unit.specializationData.type === "Prospector" ? unit.specializationData.veinFinderLevel : 0;
-  return getUpgradeCost(veinFinderUpgrade, level);
-}
-
-function getCritChanceCost(minerIndex: number): number {
-  const unit = getMinerUpgrade(minerIndex);
-  const level = unit.specializationData.type === "Crit Build" ? unit.specializationData.critChanceLevel : 0;
-  return getUpgradeCost(critChanceUpgrade, level);
-}
-
-function getCritMultiplierCost(minerIndex: number): number {
-  const unit = getMinerUpgrade(minerIndex);
-  const level = unit.specializationData.type === "Crit Build" ? unit.specializationData.critMultiplierLevel : 0;
-  return getUpgradeCost(critMultiplierUpgrade, level);
-}
-
-function getChainReactionCost(minerIndex: number): number {
-  const unit = getMinerUpgrade(minerIndex);
-  const level = unit.specializationData.type === "Chain Lightning" ? unit.specializationData.chainReactionLevel : 0;
-  return getUpgradeCost(chainReactionUpgrade, level);
-}
-
-function getDoubleActivationMinPercent(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "Multi Activator")) {
-    return 0;
-  }
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Multi Activator" ? data.multiActivationMinLevel : 0;
-  return 0.1 + level * 0.1;
-}
-
-function getDoubleActivationMaxPercent(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "Multi Activator")) {
-    return 0;
-  }
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Multi Activator" ? data.multiActivationMaxLevel : 0;
-  return 0.2 + level * 0.2;
-}
-
-function rollDoubleActivation(minerIndex: number): number {
-  const minPercent = getDoubleActivationMinPercent(minerIndex);
-  const maxPercent = getDoubleActivationMaxPercent(minerIndex);
-
-  // If min > max, just use max
-  if (minPercent > maxPercent) {
-    return maxPercent;
-  }
-
-  // Roll between min and max
-  return minPercent + Math.random() * (maxPercent - minPercent);
-}
-
-function getActivationCountFromRoll(roll: number): number {
-  // roll is in decimal form (0.4 = 40%, 2.3 = 230%)
-  // For every 1.0 (100%), activate one tile
-  // For the remainder, there's a percentage chance for another
-  const fullActivations = Math.floor(roll);
-  const remainder = roll - fullActivations;
-  const extraChance = Math.random() < remainder ? 1 : 0;
-  return fullActivations + extraChance;
-}
-
-// Stat display functions for showing current vs next level
-function getOreGenerationStatText(ore: UpgradableOre): string {
-  const currentLevel = getOreGenerationLevel(ore);
-  const currentWeight = getOreWeightForLevel(ore, currentLevel);
-  const nextWeight = getOreWeightForLevel(ore, currentLevel + 1);
-  if (currentLevel <= 0) {
-    return `Locked. Weight: 0 → ${round(nextWeight, 2).toLocaleString()} on first upgrade`;
-  }
-  return `Weight: ${round(currentWeight, 2).toLocaleString()} → ${round(nextWeight, 2).toLocaleString()} (+20%)`;
-}
-
-function getMinerSpeedStatText(minerIndex: number): string {
-  const upgrade = getMinerUpgrade(minerIndex);
-  const base = 1 / (idleMiner.triggerIntervalSeconds || 5);
-  const bonus = fasterMinerUpgrade.bonusClicksPerSecond || 0.1;
-  const current = (base + upgrade.speedLevel * bonus).toFixed(2);
-  const next = (base + (upgrade.speedLevel + 1) * bonus).toFixed(2);
-  return `Current: ${current} act/sec → Upgrading to: ${next} act/sec`;
-}
-
-function getMinerRadiusStatText(minerIndex: number): string {
-  const upgrade = getMinerUpgrade(minerIndex);
-  const nextRadius = upgrade.radiusLevel + 1;
-  const multiplier = minerRadiusUpgrade.radiusMultiplierPerLevel || 1.25;
-  const currentMultiplier = (multiplier ** upgrade.radiusLevel).toFixed(2);
-  const nextMultiplier = (multiplier ** nextRadius).toFixed(2);
-  return `Current: ${currentMultiplier}x radius → Upgrading to: ${nextMultiplier}x radius`;
-}
-
-function getDoubleActivationMinStatText(minerIndex: number): string {
-  const current = (getDoubleActivationMinPercent(minerIndex) * 100).toFixed(0);
-  const next = ((getDoubleActivationMinPercent(minerIndex) + 0.1) * 100).toFixed(0);
-  return `Current min: ${current}% → Upgrading to: ${next}%`;
-}
-
-function getDoubleActivationMaxStatText(minerIndex: number): string {
-  const current = (getDoubleActivationMaxPercent(minerIndex) * 100).toFixed(0);
-  const next = ((getDoubleActivationMaxPercent(minerIndex) + 0.2) * 100).toFixed(0);
-  return `Current max: ${current}% → Upgrading to: ${next}%`;
-}
-
-function getVeinFinderQualityMultiplier(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "Prospector")) {
-    return 1;
-  }
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Prospector" ? data.veinFinderLevel : 0;
-  return 1.25 + level * 0.25;
-}
-
-function getVeinFinderStatText(minerIndex: number): string {
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Prospector" ? data.veinFinderLevel : 0;
-  const currentBoost = (getVeinFinderQualityMultiplier(minerIndex) - 1) * 100;
-  const nextBoost = (1 + (level + 1) * 0.25 - 1) * 100;
-  return `Current boost: +${currentBoost.toFixed(0)}% → Upgrading to: +${nextBoost.toFixed(0)}% for mined ore respawn weight`;
-}
-
-function getCritChance(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "Crit Build")) {
-    return 0;
-  }
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
-  return Math.min(0.6, 0.1 + level * 0.03);
-}
-
-function getCritMultiplier(minerIndex: number): number {
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Crit Build" ? data.critMultiplierLevel : 0;
-  return 2 + level * 0.2;
-}
-
-function getChainReactionChance(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "Chain Lightning")) {
-    return 0;
-  }
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Chain Lightning" ? data.chainReactionChanceLevel : 0;
-  return Math.min(0.5, 0.1 + level * 0.02);
-}
-
-function getChainReactionLength(minerIndex: number): number {
-  if (!canUseClass(minerIndex, "Chain Lightning")) {
-    return 0;
-  }
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Chain Lightning" ? data.chainReactionLevel : 0;
-  return 1 + level;
-}
-
-function getCritChanceStatText(minerIndex: number): string {
-  const current = (getCritChance(minerIndex) * 100).toFixed(0);
-  const data = getMinerUpgrade(minerIndex).specializationData;
-  const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
-  const next = (Math.min(0.5, (level + 1) * 0.03) * 100).toFixed(0);
-  return `Current chance: ${current}% → Upgrading to: ${next}%`;
-}
-
-function getCritMultiplierStatText(minerIndex: number): string {
-  const current = getCritMultiplier(minerIndex).toFixed(1);
-  const next = (getCritMultiplier(minerIndex) + 0.2).toFixed(1);
-  return `Current crit: ${current}x → Upgrading to: ${next}x`;
-}
-
-function getChainReactionStatText(minerIndex: number): string {
-  const currentChance = (getChainReactionChance(minerIndex) * 100).toFixed(0);
-  const currentLength = getChainReactionLength(minerIndex);
-  const nextLength = currentLength + 1;
-  return `Current: ${currentChance}% chance, ${currentLength} adjacent chain(s) → Upgrading to: ${nextLength}`;
-}
-
-function getMinerDisplayName(minerIndex: number): string {
-  const spec = getMinerUpgrade(minerIndex).specialization;
-  const number = minerIndex + 1;
-  return `${getSpecializationLabel(spec)} ${number}`;
-}
-
-function getMinerRingLabel(minerIndex: number): string {
-  const upgrade = getMinerUpgrade(minerIndex);
-  if (upgrade.specialization === "Prospector") {
-    return `🧭${minerIndex + 1}`;
-  }
-  if (upgrade.specialization === "Crit Build") {
-    return `🎯${minerIndex + 1}`;
-  }
-  if (upgrade.specialization === "Chain Lightning") {
-    return `⚡${minerIndex + 1}`;
-  }
-  if (upgrade.specialization === "Multi Activator") {
-    return `⏩${minerIndex + 1}`;
-  }
-  return `W${minerIndex + 1}`;
-}
-
-function canOfferClassUnlock(minerIndex: number): boolean {
-  const upgrade = getMinerUpgrade(minerIndex);
-  return !upgrade.specializationUnlocked && upgrade.specialization === "Worker" && getMinerClicksPerSecond(minerIndex) >= 1;
-}
-
-function canChooseSpecialization(minerIndex: number): boolean {
-  const upgrade = getMinerUpgrade(minerIndex);
-  return upgrade.specializationUnlocked && upgrade.specialization === "Worker";
-}
-
-function canUseClass(minerIndex: number, spec: UnitSpecialization): boolean {
-  const selected = getMinerUpgrade(minerIndex).specialization;
-  return selected === spec;
-}
+const {
+  getMinerUpgrade,
+  getMinerClicksPerSecond,
+  getMinerCooldownSeconds,
+  getMinerSpeedUpgradeCost,
+  getMinerRadiusUpgradeCost,
+  getMinerEffectRadiusPx,
+  getDoubleActivationMinCost,
+  getDoubleActivationMaxCost,
+  getVeinFinderCost,
+  getCritChanceCost,
+  getCritMultiplierCost,
+  getChainReactionCost,
+  getDoubleActivationMinPercent,
+  getDoubleActivationMaxPercent,
+  rollDoubleActivation,
+  getActivationCountFromRoll,
+  getMinerSpeedStatText,
+  getMinerRadiusStatText,
+  getDoubleActivationMinStatText,
+  getDoubleActivationMaxStatText,
+  getVeinFinderQualityMultiplier,
+  getVeinFinderStatText,
+  getCritChance,
+  getCritMultiplier,
+  getChainReactionChance,
+  getChainReactionLength,
+  getCritChanceStatText,
+  getCritMultiplierStatText,
+  getChainReactionStatText,
+  getMinerDisplayName,
+  getMinerRingLabel,
+  canOfferClassUnlock,
+  canChooseSpecialization,
+  canUseClass,
+  chooseTargetTile,
+  getCoinsPerSecond,
+  getMinerPosition,
+  getEligibleTilesForMiner,
+} = createMinerLogic({
+  state,
+  getMapSize,
+  getUpgradeCost,
+  getTileCoinValue,
+  getDefaultSpecializationData,
+  normalizeSpecialization,
+  buildSpecializationData,
+  getSpecializationLabel,
+  minTileCoverageInRadius: MIN_TILE_COVERAGE_IN_RADIUS,
+  baseMinerEffectRadiusPx: BASE_MINER_EFFECT_RADIUS_PX,
+  idleMinerTriggerIntervalSeconds: idleMiner.triggerIntervalSeconds || 5,
+  fasterMinerBonusClicksPerSecond: fasterMinerUpgrade.bonusClicksPerSecond || 0.1,
+  minerRadiusMultiplierPerLevel: minerRadiusUpgrade.radiusMultiplierPerLevel || 1.25,
+  fasterMinerUpgrade,
+  minerRadiusUpgrade,
+  doubleActivationMinUpgrade,
+  doubleActivationMaxUpgrade,
+  veinFinderUpgrade,
+  critChanceUpgrade,
+  critMultiplierUpgrade,
+  chainReactionUpgrade,
+});
 
 function selectMinerSpecialization(spec: Exclude<UnitSpecialization, "Worker">): void {
   const minerIndex = interactionState.selectedMinerIndex;
@@ -798,11 +460,6 @@ function unlockClassChoice(): void {
   render();
 }
 
-function setClassModalOpen(isOpen: boolean): void {
-  if (!ui.classModal) return;
-  ui.classModal.classList.toggle("hidden", !isOpen);
-}
-
 function setMinerTargeting(mode: MinerTargeting): void {
   const minerIndex = interactionState.selectedMinerIndex;
   if (minerIndex === null) {
@@ -810,39 +467,6 @@ function setMinerTargeting(mode: MinerTargeting): void {
   }
   state.units[minerIndex].targeting = mode;
   renderMinerPopup();
-}
-
-function chooseTargetTile(minerIndex: number, eligibleTiles: HTMLElement[]): HTMLElement {
-  const targeting = getMinerUpgrade(minerIndex).targeting;
-  if (targeting === "random") {
-    return eligibleTiles[Math.floor(Math.random() * eligibleTiles.length)];
-  }
-
-  let targetValue = targeting === "high-quality" ? -Infinity : Infinity;
-  const bestTiles: HTMLElement[] = [];
-
-  for (const tile of eligibleTiles) {
-    const tileType = (tile.dataset.tileType as OreType) || "sand";
-    const value = getTileCoinValue(tileType);
-    const isBetter = targeting === "high-quality" ? value > targetValue : value < targetValue;
-    if (isBetter) {
-      targetValue = value;
-      bestTiles.length = 0;
-      bestTiles.push(tile);
-    } else if (value === targetValue) {
-      bestTiles.push(tile);
-    }
-  }
-
-  return bestTiles[Math.floor(Math.random() * bestTiles.length)] || eligibleTiles[0];
-}
-
-function getCoinsPerSecond(): number {
-  let total = 0;
-  for (let minerIndex = 0; minerIndex < state.idleMinerOwned; minerIndex += 1) {
-    total += getMinerClicksPerSecond(minerIndex);
-  }
-  return total;
 }
 
 function format(value: number): string {
@@ -920,132 +544,12 @@ function loadGame(): void {
   }
 }
 
-function getMinerPosition(minerIndex: number): Position {
-  const position = state.idleMinerPositions[minerIndex];
-  if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
-    return position;
-  }
-  return getDefaultMinerPosition(minerIndex, state.idleMinerOwned, getMapSize());
-}
-
-function getEligibleTilesForMiner(minerIndex: number, availableTiles: HTMLElement[], mapSize: number): HTMLElement[] {
-  const minerPosition = getMinerPosition(minerIndex);
-  const minerRadius = getMinerEffectRadiusPx(minerIndex);
-
-  return availableTiles.filter((tile) => {
-    const tileIndex = Number(tile.dataset.tileIndex);
-    if (!Number.isInteger(tileIndex) || tileIndex < 0) {
-      return false;
-    }
-
-    const bounds = getTileBoundsByIndex(tileIndex, mapSize);
-    const coverage = getTileCoverageInMinerRadius(minerPosition, bounds, minerRadius);
-    return coverage >= MIN_TILE_COVERAGE_IN_RADIUS;
-  });
-}
-
-function getAdjacentTileIndices(tileIndex: number, mapSize: number): number[] {
-  const column = tileIndex % mapSize;
-  const row = Math.floor(tileIndex / mapSize);
-  const indices: number[] = [];
-
-  if (row > 0) indices.push(tileIndex - mapSize);
-  if (row < mapSize - 1) indices.push(tileIndex + mapSize);
-  if (column > 0) indices.push(tileIndex - 1);
-  if (column < mapSize - 1) indices.push(tileIndex + 1);
-
-  return indices;
-}
-
-function triggerChainReaction(minerIndex: number, sourceTile: HTMLElement, mapSize: number): number {
-  if (!ui.mapGrid || Math.random() >= getChainReactionChance(minerIndex)) {
-    return 0;
-  }
-
-  let triggered = 0;
-  let currentTile = sourceTile;
-  let remainingSteps = getChainReactionLength(minerIndex);
-  const usedIndices = new Set<number>();
-  const sourceIndex = Number(sourceTile.dataset.tileIndex);
-  if (Number.isInteger(sourceIndex)) {
-    usedIndices.add(sourceIndex);
-  }
-
-  while (remainingSteps > 0) {
-    const currentIndex = Number(currentTile.dataset.tileIndex);
-    if (!Number.isInteger(currentIndex)) {
-      break;
-    }
-
-    const adjacentTiles = getAdjacentTileIndices(currentIndex, mapSize)
-      .map((index) => ui.mapGrid?.querySelector(`.map-tile[data-tile-index="${index}"]`) as HTMLElement | null)
-      .filter(
-        (tile): tile is HTMLElement =>
-          tile instanceof HTMLElement &&
-          !tile.classList.contains("map-tile--cooldown") &&
-          !usedIndices.has(Number(tile.dataset.tileIndex))
-      );
-
-    if (adjacentTiles.length === 0) {
-      break;
-    }
-
-    const nextTile = adjacentTiles[Math.floor(Math.random() * adjacentTiles.length)];
-    const nextIndex = Number(nextTile.dataset.tileIndex);
-    if (Number.isInteger(nextIndex)) {
-      usedIndices.add(nextIndex);
-    }
-
-    if (!activateTile(nextTile, false, minerIndex)) {
-      break;
-    }
-
-    triggered += 1;
-    currentTile = nextTile;
-    remainingSteps -= 1;
-  }
-
-  return triggered;
-}
-
-function setSettingsModalOpen(isOpen: boolean): void {
-  if (!ui.settingsModal || !ui.settingsToggle) return;
-  ui.settingsModal.classList.toggle("hidden", !isOpen);
-  ui.settingsModal.setAttribute("aria-hidden", String(!isOpen));
-  ui.settingsToggle.setAttribute("aria-expanded", String(isOpen));
-}
-
-function openMinerPanels(minerIndex: number): void {
-  interactionState.selectedMinerIndex = minerIndex;
-  interactionState.repositionMode = false;
-  interactionState.resourceStatsOpen = false;
-  interactionState.upgradePanelOpen = true;
-  interactionState.statsPanelOpen = true;
-  renderResourceStatsPanel();
-  renderMinerStatsPanel();
-  renderMinerPopup();
-}
-
 function renderResourceStatsPanel(): void {
   renderResourceStatsPanelView({
     resourceStatsPanel: ui.resourceStatsPanel,
     resourceStatsToggle: ui.resourceStatsToggle,
     isOpen: interactionState.resourceStatsOpen,
   });
-}
-
-function toggleResourceStatsPanel(): void {
-  const willOpen = !interactionState.resourceStatsOpen;
-  if (willOpen) {
-    closeMinerStatsPanel();
-  }
-  interactionState.resourceStatsOpen = willOpen;
-  renderResourceStatsPanel();
-}
-
-function closeResourceStatsPanel(): void {
-  interactionState.resourceStatsOpen = false;
-  renderResourceStatsPanel();
 }
 
 function renderUpgradesAccordion(): void {
@@ -1056,327 +560,94 @@ function renderUpgradesAccordion(): void {
   });
 }
 
-function toggleUpgradesAccordion(): void {
-  interactionState.upgradesAccordionOpen = !interactionState.upgradesAccordionOpen;
-  renderUpgradesAccordion();
-}
+const {
+  setSettingsModalOpen,
+  setClassModalOpen,
+  openMinerPanels,
+  toggleResourceStatsPanel,
+  closeResourceStatsPanel,
+  toggleUpgradesAccordion,
+  closeMinerUpgradePanel,
+  closeMinerStatsPanel,
+  closeMinerPanels,
+} = createUiPanelControls({
+  ui,
+  interactionState,
+  renderResourceStatsPanel,
+  renderMinerStatsPanel,
+  renderMinerPopup,
+  renderUpgradesAccordion,
+});
 
-function closeMinerUpgradePanel(): void {
-  interactionState.upgradePanelOpen = false;
-  interactionState.repositionMode = false;
-  interactionState.placementMode = false;
-  interactionState.activeMinerIndex = null;
-  if (!interactionState.statsPanelOpen) {
-    interactionState.selectedMinerIndex = null;
-  }
-  if (ui.minerPopup) {
-    ui.minerPopup.classList.add("hidden");
-  }
-}
+const { applyTileType, activateTile, triggerChainReaction } = createTileActions({
+  mapGrid: ui.mapGrid,
+  addCoins: (amount) => {
+    state.coins += amount;
+  },
+  getTileCoinValue,
+  getCritChance,
+  getCritMultiplier,
+  getVeinFinderQualityMultiplier,
+  rollTileType,
+  rollTileTypeWithBoostedOre,
+  getChainReactionChance,
+  getChainReactionLength,
+  render,
+});
 
-function closeMinerStatsPanel(): void {
-  interactionState.statsPanelOpen = false;
-  if (!interactionState.upgradePanelOpen) {
-    interactionState.selectedMinerIndex = null;
-  }
-  if (ui.minerStatsPanel) {
-    ui.minerStatsPanel.classList.add("hidden");
-  }
-}
+const {
+  buyMinerSpeedUpgrade,
+  buyMinerRadiusUpgrade,
+  toggleMinerRepositionMode,
+  buyDoubleActivationMin,
+  buyDoubleActivationMax,
+  buyVeinFinderUpgrade,
+  buyCritChanceUpgrade,
+  buyCritMultiplierUpgrade,
+  buyChainReactionUpgrade,
+} = createMinerActions({
+  state,
+  interactionState,
+  canAfford,
+  canUseClass,
+  render,
+  getMinerSpeedUpgradeCost,
+  getMinerRadiusUpgradeCost,
+  getMinerCooldownSeconds,
+  getDoubleActivationMinCost,
+  getDoubleActivationMaxCost,
+  getVeinFinderCost,
+  getCritChanceCost,
+  getCritMultiplierCost,
+  getChainReactionCost,
+});
 
-function closeMinerPanels(): void {
-  interactionState.upgradePanelOpen = false;
-  interactionState.statsPanelOpen = false;
-  interactionState.selectedMinerIndex = null;
-  interactionState.repositionMode = false;
-  interactionState.placementMode = false;
-  interactionState.activeMinerIndex = null;
-  if (ui.minerPopup) {
-    ui.minerPopup.classList.add("hidden");
-  }
-  if (ui.minerStatsPanel) {
-    ui.minerStatsPanel.classList.add("hidden");
-  }
-}
-
-function clearTileOreClasses(tile: HTMLElement): void {
-  tile.classList.remove("map-tile--coal", "map-tile--copper", "map-tile--iron", "map-tile--silver", "map-tile--gold");
-}
-
-function getTileAriaLabel(tileType: OreType): string {
-  switch (tileType) {
-    case "coal":
-      return "Coal tile";
-    case "copper":
-      return "Copper tile";
-    case "iron":
-      return "Iron tile";
-    case "silver":
-      return "Silver tile";
-    case "gold":
-      return "Gold tile";
-    default:
-      return "Sandy tile";
-  }
-}
-
-function applyTileType(tile: HTMLElement, tileType: OreType): void {
-  tile.dataset.tileType = tileType;
-  clearTileOreClasses(tile);
-  if (tileType !== "sand") {
-    tile.classList.add(`map-tile--${tileType}`);
-  }
-  tile.setAttribute("aria-label", getTileAriaLabel(tileType));
-}
-
-function activateTile(tile: HTMLElement, shouldRender: boolean = true, minerIndex: number | null = null): boolean {
-  if (!(tile instanceof HTMLElement) || tile.classList.contains("map-tile--cooldown")) {
-    return false;
-  }
-
-  const tileType = (tile.dataset.tileType as OreType) || "sand";
-  let payout = getTileCoinValue(tileType);
-  if (minerIndex !== null && Math.random() < getCritChance(minerIndex)) {
-    payout *= getCritMultiplier(minerIndex);
-  }
-  state.coins += payout;
-  
-  tile.classList.add("map-tile--cooldown");
-  tile.dataset.tileType = "sand";
-  clearTileOreClasses(tile);
-
-  const minedOre = tileType === "sand" ? null : (tileType as UpgradableOre);
-  const qualityMultiplier = minerIndex === null ? 1 : getVeinFinderQualityMultiplier(minerIndex);
-  
-  setTimeout(() => {
-    tile.classList.remove("map-tile--cooldown");
-    if (minedOre && qualityMultiplier > 1) {
-      applyTileType(tile, rollTileTypeWithBoostedOre(minedOre, qualityMultiplier));
-    } else {
-      applyTileType(tile, rollTileType());
-    }
-  }, 1000);
-
-  if (shouldRender) {
-    render();
-  }
-  return true;
-}
-
-function buyIdleMiner(): void {
-  const cost = getIdleMinerCost();
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  state.idleMinerOwned += 1;
-  syncIdleMinerState();
-  render();
-}
-
-function buyMinerSpeedUpgrade(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) {
-    return;
-  }
-
-  const cost = getMinerSpeedUpgradeCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-
-  const previousCooldown = getMinerCooldownSeconds(minerIndex);
-  state.coins -= cost;
-  state.units[minerIndex].speedLevel += 1;
-  const updatedCooldown = getMinerCooldownSeconds(minerIndex);
-
-  if (Number.isFinite(previousCooldown) && previousCooldown > 0) {
-    const scale = updatedCooldown / previousCooldown;
-    state.idleMinerCooldowns[minerIndex] = Math.max(0, state.idleMinerCooldowns[minerIndex] * scale);
-  }
-
-  render();
-}
-
-function buyMinerRadiusUpgrade(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) {
-    return;
-  }
-
-  const cost = getMinerRadiusUpgradeCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-
-  state.coins -= cost;
-  state.units[minerIndex].radiusLevel += 1;
-  render();
-}
-
-function toggleMinerRepositionMode(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) {
-    return;
-  }
-
-  interactionState.placementMode = !interactionState.placementMode;
-  renderMinerPopup();
-  renderMinerRing();
-}
-
-function resetGame(): void {
-  clearSavedGame(SAVE_KEY);
-  state.coins = 0;
-  state.idleMinerOwned = 0;
-  state.mapExpansions = 0;
-  state.resources = createDefaultResources();
-  state.lastTick = Date.now();
-  state.lastRenderedMapSize = 0;
-  state.idleMinerCooldowns = [];
-  state.idleMinerPositions = [];
-  state.units = [];
-  closeMinerPanels();
-  render();
-  setSettingsModalOpen(false);
-  setStatus("Progress reset.");
-}
-
-function buyMapExpansion(): void {
-  const cost = getMapExpansionCost();
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  state.mapExpansions += 1;
-  render();
-}
-
-function buyOreGeneration(ore: UpgradableOre): void {
-  const cost = getOreGenerationCost(ore);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  setOreGenerationLevel(ore, getOreGenerationLevel(ore) + 1);
-  render();
-}
-
-function buyCoalGeneration(): void {
-  buyOreGeneration("coal");
-}
-
-function buyCopperGeneration(): void {
-  buyOreGeneration("copper");
-}
-
-function buyIronGeneration(): void {
-  buyOreGeneration("iron");
-}
-
-function buySilverGeneration(): void {
-  buyOreGeneration("silver");
-}
-
-function buyGoldGeneration(): void {
-  buyOreGeneration("gold");
-}
-
-function buyDoubleActivationMin(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "Multi Activator")) return;
-  const cost = getDoubleActivationMinCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  const data = state.units[minerIndex].specializationData;
-  if (data.type === "Multi Activator") {
-    data.multiActivationMinLevel += 1;
-  }
-  render();
-}
-
-function buyDoubleActivationMax(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "Multi Activator")) return;
-  const cost = getDoubleActivationMaxCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  const data = state.units[minerIndex].specializationData;
-  if (data.type === "Multi Activator") {
-    data.multiActivationMaxLevel += 1;
-  }
-  render();
-}
-
-function buyVeinFinderUpgrade(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "Prospector")) return;
-  const cost = getVeinFinderCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  const data = state.units[minerIndex].specializationData;
-  if (data.type === "Prospector") {
-    data.veinFinderLevel += 1;
-  }
-  render();
-}
-
-function buyCritChanceUpgrade(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "Crit Build")) return;
-  const cost = getCritChanceCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  const data = state.units[minerIndex].specializationData;
-  if (data.type === "Crit Build") {
-    data.critChanceLevel += 1;
-  }
-  render();
-}
-
-function buyCritMultiplierUpgrade(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "Crit Build")) return;
-  const cost = getCritMultiplierCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  const data = state.units[minerIndex].specializationData;
-  if (data.type === "Crit Build") {
-    data.critMultiplierLevel += 1;
-  }
-  render();
-}
-
-function buyChainReactionUpgrade(): void {
-  const minerIndex = interactionState.selectedMinerIndex;
-  if (minerIndex === null) return;
-  if (!canUseClass(minerIndex, "Chain Lightning")) return;
-  const cost = getChainReactionCost(minerIndex);
-  if (!canAfford(cost)) {
-    return;
-  }
-  state.coins -= cost;
-  const data = state.units[minerIndex].specializationData;
-  if (data.type === "Chain Lightning") {
-    data.chainReactionLevel += 1;
-  }
-  render();
-}
+const {
+  buyIdleMiner,
+  resetGame,
+  buyMapExpansion,
+  buyCoalGeneration,
+  buyCopperGeneration,
+  buyIronGeneration,
+  buySilverGeneration,
+  buyGoldGeneration,
+} = createGameActions({
+  state,
+  saveKey: SAVE_KEY,
+  clearSavedGame,
+  createDefaultResources,
+  canAfford,
+  getIdleMinerCost,
+  getMapExpansionCost,
+  getOreGenerationCost,
+  getOreGenerationLevel,
+  setOreGenerationLevel,
+  syncIdleMinerState,
+  closeMinerPanels,
+  render,
+  setSettingsModalOpen,
+  setStatus,
+});
 
 function renderMap(): void {
   if (!ui.mapGrid) return;
