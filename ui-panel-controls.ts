@@ -62,6 +62,7 @@ export function createUiPanelControls(args: CreateUiPanelControlsArgs): {
   function setClassModalOpen(isOpen: boolean): void {
     if (!ui.classModal) return;
     ui.classModal.classList.toggle("hidden", !isOpen);
+    ui.classModal.setAttribute("aria-hidden", String(!isOpen));
   }
 
   function openMinerPanels(minerIndex: number): void {

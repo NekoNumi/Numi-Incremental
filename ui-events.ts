@@ -247,6 +247,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.settingsToggle) {
     ui.settingsToggle.addEventListener("click", () => {
       if (!ui.settingsModal) return;
+      setClassModalOpen(false);
       const isHidden = ui.settingsModal.classList.contains("hidden");
       setSettingsModalOpen(isHidden);
     });
@@ -255,6 +256,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.settingsToggleMobile) {
     ui.settingsToggleMobile.addEventListener("click", () => {
       if (!ui.settingsModal) return;
+      setClassModalOpen(false);
       const isHidden = ui.settingsModal.classList.contains("hidden");
       setSettingsModalOpen(isHidden);
     });
@@ -276,6 +278,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.inventoryToggle) {
     ui.inventoryToggle.addEventListener("click", () => {
       if (!ui.inventoryModal) return;
+      setClassModalOpen(false);
       const isHidden = ui.inventoryModal.classList.contains("hidden");
       setInventoryModalOpen(isHidden);
     });
@@ -283,6 +286,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
 
   if (ui.inventoryToggleMobile) {
     ui.inventoryToggleMobile.addEventListener("click", () => {
+      setClassModalOpen(false);
       setInventoryModalOpen(true);
     });
   }
@@ -296,6 +300,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.upgradesToggle) {
     ui.upgradesToggle.addEventListener("click", () => {
       if (!ui.upgradesModal) return;
+      setClassModalOpen(false);
       const isHidden = ui.upgradesModal.classList.contains("hidden");
       setUpgradesModalOpen(isHidden);
     });
@@ -303,12 +308,14 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
 
   if (ui.upgradesToggleMobile) {
     ui.upgradesToggleMobile.addEventListener("click", () => {
+      setClassModalOpen(false);
       setUpgradesModalOpen(true);
     });
   }
 
   if (ui.mapToggleMobile) {
     ui.mapToggleMobile.addEventListener("click", () => {
+      setClassModalOpen(false);
       setInventoryModalOpen(false);
       setUpgradesModalOpen(false);
       setWorkersModalOpen(false);
@@ -317,7 +324,10 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   }
 
   if (ui.workersToggleMobile) {
-    ui.workersToggleMobile.addEventListener("click", openWorkersPanel);
+    ui.workersToggleMobile.addEventListener("click", () => {
+      setClassModalOpen(false);
+      openWorkersPanel();
+    });
   }
 
   if (ui.closeWorkersModal) {

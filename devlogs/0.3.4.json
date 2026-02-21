@@ -1,0 +1,9 @@
+{
+  "version": "Version 0.3.4",
+  "releaseId": "0.3.4",
+  "notes": [
+    "Cleaned up some console logs that were pushed to production.",
+    "Version metadata updated for the next release.",
+    "Added buffer below scrolling menus to prevent footer from covering UI elements."
+  ]
+}

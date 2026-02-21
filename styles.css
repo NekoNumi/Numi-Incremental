@@ -324,6 +324,11 @@ strong {
   min-height: auto;
 }
 
+.class-modal-card {
+  max-width: 620px;
+  min-height: auto;
+}
+
 #inventory-modal .modal-header h2 {
   text-align: center;
 }
@@ -334,6 +339,15 @@ strong {
 
 #workers-modal .modal-header h2 {
   text-align: center;
+}
+
+#class-modal .modal-header h2 {
+  text-align: center;
+}
+
+#class-modal .modal-body {
+  display: grid;
+  gap: 0.65rem;
 }
 
 @media (min-width: 861px) {
@@ -352,6 +366,11 @@ strong {
     pointer-events: none;
   }
 
+  #class-modal {
+    place-items: stretch end;
+    pointer-events: none;
+  }
+
   #inventory-modal .modal-backdrop {
     display: none;
   }
@@ -361,6 +380,10 @@ strong {
   }
 
   #worker-details-modal .modal-backdrop {
+    display: none;
+  }
+
+  #class-modal .modal-backdrop {
     display: none;
   }
 
@@ -394,6 +417,16 @@ strong {
     pointer-events: auto;
   }
 
+  #class-modal .class-modal-card {
+    width: min(460px, 92vw);
+    max-width: 460px;
+    min-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    border-radius: 12px 0 0 12px;
+    pointer-events: auto;
+  }
+
   #inventory-modal .modal-body {
     overflow-y: auto;
   }
@@ -403,6 +436,10 @@ strong {
   }
 
   #worker-details-modal .modal-body {
+    overflow-y: auto;
+  }
+
+  #class-modal .modal-body {
     overflow-y: auto;
   }
 
@@ -434,6 +471,14 @@ strong {
   }
 
   body.left-handed-mode #worker-details-modal .worker-details-modal-card {
+    border-radius: 0 12px 12px 0;
+  }
+
+  body.left-handed-mode #class-modal {
+    place-items: stretch start;
+  }
+
+  body.left-handed-mode #class-modal .class-modal-card {
     border-radius: 0 12px 12px 0;
   }
 
@@ -1176,6 +1221,10 @@ button.update-ready {
 }
 
 @media (max-width: 860px) {
+  :root {
+    --mobile-footer-clearance: calc(7.25rem + env(safe-area-inset-bottom));
+  }
+
   .app {
     width: 100%;
     max-width: 100%;
@@ -1246,6 +1295,7 @@ button.update-ready {
   #inventory-modal,
   #upgrades-modal,
   #workers-modal,
+  #class-modal,
   #settings-modal,
   #dev-log-modal {
     place-items: stretch;
@@ -1255,6 +1305,7 @@ button.update-ready {
   #inventory-modal .modal-backdrop,
   #upgrades-modal .modal-backdrop,
   #workers-modal .modal-backdrop,
+  #class-modal .modal-backdrop,
   #settings-modal .modal-backdrop,
   #dev-log-modal .modal-backdrop {
     display: none;
@@ -1263,12 +1314,18 @@ button.update-ready {
   #inventory-modal .modal-card,
   #upgrades-modal .modal-card,
   #workers-modal .modal-card,
+  #class-modal .modal-card,
   #settings-modal .modal-card,
   #dev-log-modal .modal-card {
     width: 100%;
     max-width: 100%;
     min-width: 0;
     min-height: 100vh;
+    height: 100vh;
+    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
     border-radius: 0;
     border-left: none;
     border-right: none;
@@ -1292,26 +1349,16 @@ button.update-ready {
     text-align: center;
   }
 
+  #inventory-modal .modal-body,
+  #upgrades-modal .modal-body,
+  #workers-modal .modal-body,
+  #class-modal .modal-body,
+  #settings-modal .modal-body,
   #dev-log-modal .modal-body {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-  }
-
-  #inventory-modal .modal-body {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-  }
-
-  #workers-modal .modal-body {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-  }
-
-  #close-inventory-modal {
-    display: none;
+    padding-bottom: var(--mobile-footer-clearance);
+    scroll-padding-bottom: var(--mobile-footer-clearance);
   }
 
   .topbar-action-button {
@@ -1328,7 +1375,7 @@ button.update-ready {
   }
 
   .app {
-    padding-bottom: calc(5.8rem + env(safe-area-inset-bottom));
+    padding-bottom: var(--mobile-footer-clearance);
   }
 
   .mobile-footer {
