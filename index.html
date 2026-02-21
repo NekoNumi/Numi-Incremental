@@ -293,6 +293,26 @@
             <h3>Accessability Settings</h3>
             <button id="toggle-left-handed-mode">Left Handed Mode: Off</button>
           </section>
+          <section class="settings-section" aria-label="Development Settings">
+            <h3>Development Settings</h3>
+            <button id="open-dev-log">Open Dev Log</button>
+            <button id="check-for-updates">Check for Updates</button>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="dev-log-modal" class="modal hidden" aria-label="Development log" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card dev-log-modal-card">
+        <header class="modal-header">
+          <h2>Development Log</h2>
+          <div class="modal-actions">
+            <button id="close-dev-log-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body dev-log-body">
+          <div id="dev-log-accordion" class="dev-log-accordion" aria-label="Changelog versions"></div>
         </div>
       </div>
     </section>

@@ -9,6 +9,13 @@ A minimal browser idle game starter built with plain HTML, CSS, and JavaScript.
 - Cost scaling for upgrades
 - Auto-save and load via localStorage
 - Simple offline progression (capped)
+- Versioned dev log modal that appears on first launch of a new release
+- PWA update check with one-time focus/open detection and reload prompt
+
+## Dev logs
+
+- Add one JSON file per release in `devlogs/` (example: `devlogs/0.3.0.json`).
+- Register the new file in `devlogs.ts` so it appears in the in-game dev log accordion.
 
 ## Setup (Windows)
 

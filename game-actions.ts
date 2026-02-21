@@ -80,6 +80,10 @@ export function createGameActions(args: CreateGameActionsArgs): {
     state.inventory = createEmptyInventory();
     state.lastTick = Date.now();
     state.lastRenderedMapSize = 0;
+    state.lastRenderedTileSizePx = 0;
+    state.lastRenderedTileGapPx = 0;
+    state.lastMapContainerWidth = 0;
+    state.lastMapContainerHeight = 0;
     state.idleMinerCooldowns = [];
     state.idleMinerPositions = [];
     state.units = [];

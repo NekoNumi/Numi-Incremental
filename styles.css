@@ -25,6 +25,9 @@ body {
 
 .topbar {
   display: block;
+  position: sticky;
+  top: 0;
+  z-index: 24;
 }
 
 .icon-button {
@@ -492,6 +495,43 @@ strong {
 .settings-section h3 {
   font-size: 0.9rem;
   color: #9bbdeb;
+}
+
+.dev-log-modal-card {
+  width: min(680px, 92vw);
+  min-height: auto;
+  max-height: min(82vh, 760px);
+}
+
+.dev-log-body {
+  overflow-y: auto;
+}
+
+.dev-log-accordion {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.dev-log-entry {
+  border: 1px solid #2b3550;
+  border-radius: 10px;
+  background: #182239;
+  padding: 0.5rem 0.65rem;
+}
+
+.dev-log-entry-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #d4e8ff;
+}
+
+.dev-log-notes {
+  margin: 0.45rem 0 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.25rem;
+  opacity: 0.9;
+  font-size: 0.9rem;
 }
 
 .modal-actions {
@@ -1180,7 +1220,8 @@ button:disabled {
   #inventory-modal,
   #upgrades-modal,
   #workers-modal,
-  #settings-modal {
+  #settings-modal,
+  #dev-log-modal {
     place-items: stretch;
     z-index: 30;
   }
@@ -1188,14 +1229,16 @@ button:disabled {
   #inventory-modal .modal-backdrop,
   #upgrades-modal .modal-backdrop,
   #workers-modal .modal-backdrop,
-  #settings-modal .modal-backdrop {
+  #settings-modal .modal-backdrop,
+  #dev-log-modal .modal-backdrop {
     display: none;
   }
 
   #inventory-modal .modal-card,
   #upgrades-modal .modal-card,
   #workers-modal .modal-card,
-  #settings-modal .modal-card {
+  #settings-modal .modal-card,
+  #dev-log-modal .modal-card {
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -1215,10 +1258,18 @@ button:disabled {
   }
 
   #settings-modal .modal-actions button,
-  #settings-modal #toggle-left-handed-mode {
+  #settings-modal #toggle-left-handed-mode,
+  #settings-modal #open-dev-log,
+  #settings-modal #check-for-updates {
     width: 100%;
     min-width: 0;
     text-align: center;
+  }
+
+  #dev-log-modal .modal-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
   #inventory-modal .modal-body {
@@ -1251,7 +1302,7 @@ button:disabled {
   }
 
   .app {
-    padding-bottom: calc(4.4rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5.8rem + env(safe-area-inset-bottom));
   }
 
   .mobile-footer {
@@ -1263,15 +1314,22 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.45rem;
-    padding: 0.55rem;
-    padding-bottom: calc(0.55rem + env(safe-area-inset-bottom));
+    padding: 0.7rem;
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
     background: #1b2233;
     border-top: 1px solid #2b3550;
   }
 
   .mobile-footer-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     min-width: 0;
+    min-height: 3.25rem;
+    padding: 0.9rem 1.15rem;
+    font-size: 0.9rem;
+    text-align: center;
   }
 
   .mobile-footer.mobile-footer-left-handed {

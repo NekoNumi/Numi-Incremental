@@ -76,6 +76,10 @@ export interface GameState {
   inventory: ResourceInventory;
   lastTick: number;
   lastRenderedMapSize: number;
+  lastRenderedTileSizePx: number;
+  lastRenderedTileGapPx: number;
+  lastMapContainerWidth: number;
+  lastMapContainerHeight: number;
   idleMinerCooldowns: number[];
   idleMinerPositions: (Position | null)[];
   units: Unit[];

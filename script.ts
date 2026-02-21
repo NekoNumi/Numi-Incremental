@@ -34,6 +34,7 @@ import { renderMinerPopupView, renderMinerStatsPanelView } from "./ui-miner-pane
 import { createUiPanelControls } from "./ui-panel-controls";
 import { renderResourceStatsPanelView, renderUpgradesAccordionView } from "./ui-renderers";
 import { bindUiEvents } from "./ui-events";
+import { getChangelogEntries, type ChangelogEntry } from "./devlogs";
 import {
   buildSpecializationData,
   getDefaultSpecializationData,
@@ -98,6 +99,11 @@ interface UIElements {
   addCoins: HTMLButtonElement | null;
   toggleLeftHandedMode: HTMLButtonElement | null;
   reset: HTMLButtonElement | null;
+  openDevLog: HTMLButtonElement | null;
+  checkForUpdates: HTMLButtonElement | null;
+  devLogModal: HTMLElement | null;
+  closeDevLogModalButton: HTMLButtonElement | null;
+  devLogAccordion: HTMLElement | null;
   mapEnvironment: HTMLElement | null;
   mapSize: HTMLElement | null;
   resourceStatsPanel: HTMLElement | null;
@@ -277,6 +283,10 @@ const state: GameState = {
   inventory: createEmptyInventory(),
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
+  lastRenderedTileSizePx: 0,
+  lastRenderedTileGapPx: 0,
+  lastMapContainerWidth: 0,
+  lastMapContainerHeight: 0,
   idleMinerCooldowns: [],
   idleMinerPositions: [],
   units: [],
@@ -319,6 +329,10 @@ interface InventoryRowRefs {
   sellButton: HTMLButtonElement;
 }
 
+const CHANGELOG_ENTRIES: ChangelogEntry[] = getChangelogEntries();
+const APP_VERSION_ID = CHANGELOG_ENTRIES[0]?.releaseId ?? "0.0.0";
+const DEV_LOG_SEEN_VERSION_KEY = "numis-idle-dev-log-seen-version";
+
 const INVENTORY_ORES: InventoryOre[] = ["sand", "coal", "copper", "iron", "silver", "gold", "amethyst", "sapphire", "emerald", "ruby", "diamond"];
 const GEMSTONE_ORES: UpgradableOre[] = ["amethyst", "sapphire", "emerald", "ruby", "diamond"];
 const inventoryDirtyOres = new Set<InventoryOre>(INVENTORY_ORES);
@@ -333,6 +347,10 @@ let placementOriginalPosition: { x: number; y: number } | null = null;
 let placementCandidateSet = false;
 let activeRepositionMinerIndex: number | null = null;
 let repositionWorkerModalOpen = false;
+let serviceWorkerRegistration: ServiceWorkerRegistration | null = null;
+let hasCheckedForUpdatesOnFocusOpen = false;
+let updateReadyToReload = false;
+let handledControllerChange = false;
 
 function markInventoryDirty(ore: InventoryOre): void {
   inventoryDirtyOres.add(ore);
@@ -484,6 +502,11 @@ const ui: UIElements = {
   addCoins: document.getElementById("add-coins") as HTMLButtonElement,
   toggleLeftHandedMode: document.getElementById("toggle-left-handed-mode") as HTMLButtonElement,
   reset: document.getElementById("reset") as HTMLButtonElement,
+  openDevLog: document.getElementById("open-dev-log") as HTMLButtonElement,
+  checkForUpdates: document.getElementById("check-for-updates") as HTMLButtonElement,
+  devLogModal: document.getElementById("dev-log-modal"),
+  closeDevLogModalButton: document.getElementById("close-dev-log-modal") as HTMLButtonElement,
+  devLogAccordion: document.getElementById("dev-log-accordion"),
   mapEnvironment: document.getElementById("map-environment"),
   mapSize: document.getElementById("map-size"),
   resourceStatsPanel: document.getElementById("resource-stats-panel"),
@@ -925,6 +948,174 @@ function setStatus(message: string): void {
       ui.status.textContent = "";
     }
   }, 1600);
+}
+
+function setDevLogModalOpen(isOpen: boolean): void {
+  if (!ui.devLogModal) {
+    return;
+  }
+
+  ui.devLogModal.classList.toggle("hidden", !isOpen);
+  ui.devLogModal.setAttribute("aria-hidden", String(!isOpen));
+}
+
+function setUpdateButtonText(): void {
+  if (!ui.checkForUpdates) {
+    return;
+  }
+
+  ui.checkForUpdates.textContent = updateReadyToReload ? "Reload to Update" : "Check for Updates";
+}
+
+function activateWaitingUpdate(): void {
+  if (serviceWorkerRegistration?.waiting) {
+    serviceWorkerRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+    return;
+  }
+
+  window.location.reload();
+}
+
+function promptForUpdateReload(): void {
+  if (!updateReadyToReload) {
+    return;
+  }
+
+  const shouldReload = window.confirm("A new update is ready. Reload now?");
+  if (shouldReload) {
+    activateWaitingUpdate();
+  }
+}
+
+function setUpdateReadyState(): void {
+  updateReadyToReload = true;
+  setUpdateButtonText();
+}
+
+function checkForUpdate(showStatusWhenUpToDate = false): void {
+  if (!serviceWorkerRegistration) {
+    if (showStatusWhenUpToDate) {
+      setStatus("Update check is unavailable.");
+    }
+    return;
+  }
+
+  serviceWorkerRegistration
+    .update()
+    .then(() => {
+      if (serviceWorkerRegistration?.waiting) {
+        setUpdateReadyState();
+        promptForUpdateReload();
+        return;
+      }
+
+      if (showStatusWhenUpToDate) {
+        setStatus("You are already on the latest version.");
+      }
+    })
+    .catch(() => {
+      if (showStatusWhenUpToDate) {
+        setStatus("Unable to check for updates right now.");
+      }
+    });
+}
+
+function checkForUpdateOnceOnFocusOrOpen(): void {
+  if (hasCheckedForUpdatesOnFocusOpen) {
+    return;
+  }
+
+  hasCheckedForUpdatesOnFocusOpen = true;
+  checkForUpdate(false);
+}
+
+function monitorServiceWorkerRegistration(registration: ServiceWorkerRegistration): void {
+  serviceWorkerRegistration = registration;
+
+  if (registration.waiting) {
+    setUpdateReadyState();
+  }
+
+  registration.addEventListener("updatefound", () => {
+    const installing = registration.installing;
+    if (!installing) {
+      return;
+    }
+
+    installing.addEventListener("statechange", () => {
+      if (installing.state === "installed" && navigator.serviceWorker.controller) {
+        setUpdateReadyState();
+        setStatus("A new update is ready.");
+        promptForUpdateReload();
+      }
+    });
+  });
+
+  setUpdateButtonText();
+}
+
+function renderDevLogEntries(): void {
+  if (!ui.devLogAccordion) {
+    return;
+  }
+
+  ui.devLogAccordion.innerHTML = "";
+
+  for (const [index, entry] of CHANGELOG_ENTRIES.entries()) {
+    const details = document.createElement("details");
+    details.className = "dev-log-entry";
+    details.open = index === 0;
+
+    const summary = document.createElement("summary");
+    summary.className = "dev-log-entry-summary";
+    summary.textContent = entry.version;
+    details.appendChild(summary);
+
+    const list = document.createElement("ul");
+    list.className = "dev-log-notes";
+    for (const note of entry.notes) {
+      const noteItem = document.createElement("li");
+      noteItem.textContent = note;
+      list.appendChild(noteItem);
+    }
+    details.appendChild(list);
+
+    details.addEventListener("toggle", () => {
+      if (!details.open || !ui.devLogAccordion) {
+        return;
+      }
+
+      for (const sibling of ui.devLogAccordion.querySelectorAll("details.dev-log-entry")) {
+        if (sibling !== details) {
+          (sibling as HTMLDetailsElement).open = false;
+        }
+      }
+    });
+
+    ui.devLogAccordion.appendChild(details);
+  }
+}
+
+function markDevLogVersionAsSeen(): void {
+  try {
+    localStorage.setItem(DEV_LOG_SEEN_VERSION_KEY, APP_VERSION_ID);
+  } catch {
+    // ignored
+  }
+}
+
+function maybeShowDevLogForCurrentVersion(): void {
+  try {
+    const seenVersion = localStorage.getItem(DEV_LOG_SEEN_VERSION_KEY);
+    if (seenVersion === APP_VERSION_ID) {
+      return;
+    }
+  } catch {
+    return;
+  }
+
+  markDevLogVersionAsSeen();
+  setDevLogModalOpen(true);
 }
 
 function isMobileViewport(): boolean {
@@ -1700,12 +1891,33 @@ const {
 function renderMap(): void {
   if (!ui.mapGrid) return;
   const mapSize = getMapSize();
-  syncMapScaleToContainer(mapSize);
+  const mapContainer = ui.mapEnvironment ?? ui.mapGrid;
+  const containerWidth = mapContainer?.clientWidth ?? 0;
+  const containerHeight = mapContainer?.clientHeight ?? 0;
+  const shouldSyncScale =
+    state.lastRenderedMapSize !== mapSize ||
+    state.lastMapContainerWidth !== containerWidth ||
+    state.lastMapContainerHeight !== containerHeight;
 
-  ui.mapGrid.style.gridTemplateColumns = `repeat(${mapSize}, ${TILE_SIZE_PX}px)`;
-  ui.mapGrid.style.gap = `${TILE_GAP_PX}px`;
-  ui.mapGrid.style.setProperty("--tile-size", `${TILE_SIZE_PX}px`);
-  ui.mapGrid.style.setProperty("--tile-gap", `${TILE_GAP_PX}px`);
+  if (shouldSyncScale) {
+    syncMapScaleToContainer(mapSize);
+    state.lastMapContainerWidth = containerWidth;
+    state.lastMapContainerHeight = containerHeight;
+  }
+
+  const tileLayoutChanged =
+    state.lastRenderedMapSize !== mapSize ||
+    state.lastRenderedTileSizePx !== TILE_SIZE_PX ||
+    state.lastRenderedTileGapPx !== TILE_GAP_PX;
+
+  if (tileLayoutChanged) {
+    ui.mapGrid.style.gridTemplateColumns = `repeat(${mapSize}, ${TILE_SIZE_PX}px)`;
+    ui.mapGrid.style.gap = `${TILE_GAP_PX}px`;
+    ui.mapGrid.style.setProperty("--tile-size", `${TILE_SIZE_PX}px`);
+    ui.mapGrid.style.setProperty("--tile-gap", `${TILE_GAP_PX}px`);
+    state.lastRenderedTileSizePx = TILE_SIZE_PX;
+    state.lastRenderedTileGapPx = TILE_GAP_PX;
+  }
 
   if (state.lastRenderedMapSize === mapSize) {
     return;
@@ -2423,6 +2635,14 @@ function render(): void {
   requestRender();
 }
 
+function handleViewportResize(): void {
+  state.lastMapContainerWidth = 0;
+  state.lastMapContainerHeight = 0;
+  state.lastRenderedTileSizePx = 0;
+  state.lastRenderedTileGapPx = 0;
+  requestRender();
+}
+
 function gameLoop(): void {
   const now = Date.now();
   const deltaSeconds = (now - state.lastTick) / 1000;
@@ -2501,6 +2721,7 @@ bindUiEvents({
   saveGame,
   addCoinsCheat,
   resetGame,
+  setDevLogModalOpen,
 });
 
 if (ui.confirmRepositionButton) {
@@ -2566,13 +2787,85 @@ if (ui.repositionWorkerModal) {
   });
 }
 
+if (ui.openDevLog) {
+  ui.openDevLog.addEventListener("click", () => {
+    setSettingsModalOpen(false);
+    setDevLogModalOpen(true);
+  });
+}
+
+if (ui.closeDevLogModalButton) {
+  ui.closeDevLogModalButton.addEventListener("click", () => {
+    setDevLogModalOpen(false);
+  });
+}
+
+if (ui.devLogModal) {
+  ui.devLogModal.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest(".modal-card")) {
+      return;
+    }
+
+    setDevLogModalOpen(false);
+  });
+}
+
+if (ui.checkForUpdates) {
+  ui.checkForUpdates.addEventListener("click", () => {
+    if (updateReadyToReload) {
+      activateWaitingUpdate();
+      return;
+    }
+    checkForUpdate(true);
+  });
+}
+
+renderDevLogEntries();
+setUpdateButtonText();
+
+window.addEventListener("resize", handleViewportResize);
+window.addEventListener("orientationchange", handleViewportResize);
+
 loadGame();
 state.lastTick = Date.now();
 renderNow();
+maybeShowDevLogForCurrentVersion();
 
 if ("serviceWorker" in navigator) {
+  window.addEventListener("focus", () => {
+    checkForUpdateOnceOnFocusOrOpen();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      checkForUpdateOnceOnFocusOrOpen();
+    }
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (handledControllerChange) {
+      return;
+    }
+
+    handledControllerChange = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then((registration) => {
+        monitorServiceWorkerRegistration(registration);
+        if (document.visibilityState === "visible") {
+          checkForUpdateOnceOnFocusOrOpen();
+        }
+      })
+      .catch(() => {});
   });
 }
 
