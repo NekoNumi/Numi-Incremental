@@ -257,6 +257,18 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUnlockClass) {
     ui.popupUnlockClass.classList.toggle("hidden", !view.canUnlockClass);
     ui.popupUnlockClass.disabled = !view.canUnlockClass || !view.specAffordable;
+
+    if (view.canUnlockClass && ui.minerPopup) {
+      const topUpgradeButton =
+        ui.popupUpgradeSpeed ??
+        ui.popupUpgradeRadius ??
+        ui.popupUpgradeOvertime ??
+        ui.popupReposition;
+
+      if (topUpgradeButton && topUpgradeButton.parentElement === ui.minerPopup && ui.popupUnlockClass.parentElement === ui.minerPopup) {
+        ui.minerPopup.insertBefore(ui.popupUnlockClass, topUpgradeButton);
+      }
+    }
   }
   if (ui.popupChooseClass) {
     ui.popupChooseClass.classList.toggle("hidden", !view.canChooseClass);

@@ -306,6 +306,8 @@ const interactionState: InteractionState = {
 let inventoryUiDirty = true;
 let lastRenderedCoinValue: number | null = null;
 let lastRenderedActivePlayWholeSeconds: number | null = null;
+let lastRenderedWorkersListSignature: string | null = null;
+let lastRenderedRepositionWorkerModalSignature: string | null = null;
 
 type InventoryOre = OreType;
 
@@ -934,6 +936,10 @@ function attachMinerPanelsToWorkersHost(): void {
     return;
   }
 
+  if (ui.minerStatsPanel.parentElement === ui.workersPanelHost && ui.minerPopup.parentElement === ui.workersPanelHost) {
+    return;
+  }
+
   ui.workersPanelHost.append(ui.minerStatsPanel, ui.minerPopup);
 }
 
@@ -942,11 +948,22 @@ function attachMinerPanelsToWorkerDetailsHost(): void {
     return;
   }
 
+  if (
+    ui.minerStatsPanel.parentElement === ui.workerDetailsPanelHost &&
+    ui.minerPopup.parentElement === ui.workerDetailsPanelHost
+  ) {
+    return;
+  }
+
   ui.workerDetailsPanelHost.append(ui.minerStatsPanel, ui.minerPopup);
 }
 
 function restoreMinerPanelsToMap(): void {
   if (!ui.minerStatsHost || !ui.minerPopupHost || !ui.minerStatsPanel || !ui.minerPopup) {
+    return;
+  }
+
+  if (ui.minerStatsPanel.parentElement === ui.minerStatsHost && ui.minerPopup.parentElement === ui.minerPopupHost) {
     return;
   }
 
@@ -987,6 +1004,11 @@ function renderWorkersList(): void {
     return;
   }
 
+  const signature = `${state.idleMinerOwned}:${interactionState.selectedMinerIndex ?? -1}`;
+  if (signature === lastRenderedWorkersListSignature) {
+    return;
+  }
+
   ui.workersList.innerHTML = "";
 
   if (state.idleMinerOwned <= 0) {
@@ -994,6 +1016,7 @@ function renderWorkersList(): void {
     emptyState.className = "workers-empty";
     emptyState.textContent = "No workers yet. Buy an Idle Miner first.";
     ui.workersList.appendChild(emptyState);
+    lastRenderedWorkersListSignature = signature;
     return;
   }
 
@@ -1008,6 +1031,8 @@ function renderWorkersList(): void {
     workerButton.textContent = getMinerDisplayName(workerIndex);
     ui.workersList.appendChild(workerButton);
   }
+
+  lastRenderedWorkersListSignature = signature;
 }
 
 function getCurrentRepositionMinerIndex(): number | null {
@@ -2333,16 +2358,22 @@ function renderNow(): void {
     ui.repositionWorkerModal.setAttribute("aria-hidden", String(!shouldShowWorkerModal));
 
     if (shouldShowWorkerModal) {
-      ui.repositionWorkerModalList.innerHTML = "";
       const optionCount = Math.min(state.idleMinerOwned, 9);
-      for (let workerIndex = 0; workerIndex < optionCount; workerIndex += 1) {
-        const optionButton = document.createElement("button");
-        optionButton.type = "button";
-        optionButton.className = "reposition-worker-option";
-        optionButton.dataset.workerIndex = workerIndex.toString();
-        optionButton.textContent = getMinerDisplayName(workerIndex);
-        ui.repositionWorkerModalList.appendChild(optionButton);
+      const modalSignature = `${optionCount}`;
+      if (modalSignature !== lastRenderedRepositionWorkerModalSignature) {
+        ui.repositionWorkerModalList.innerHTML = "";
+        for (let workerIndex = 0; workerIndex < optionCount; workerIndex += 1) {
+          const optionButton = document.createElement("button");
+          optionButton.type = "button";
+          optionButton.className = "reposition-worker-option";
+          optionButton.dataset.workerIndex = workerIndex.toString();
+          optionButton.textContent = getMinerDisplayName(workerIndex);
+          ui.repositionWorkerModalList.appendChild(optionButton);
+        }
+        lastRenderedRepositionWorkerModalSignature = modalSignature;
       }
+    } else {
+      lastRenderedRepositionWorkerModalSignature = null;
     }
   }
   if (ui.confirmRepositionButton) {
@@ -2397,9 +2428,8 @@ function gameLoop(): void {
   const deltaSeconds = (now - state.lastTick) / 1000;
   state.lastTick = now;
 
-  const isActiveSession = document.visibilityState === "visible" && document.hasFocus();
-  if (isActiveSession && Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
-    state.activePlaySeconds += Math.min(deltaSeconds, 1);
+  if (Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
+    state.activePlaySeconds += deltaSeconds;
   }
 
   runIdleMiners(deltaSeconds);
