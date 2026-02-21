@@ -6,6 +6,7 @@ interface UiRefs {
   inventoryToggle: HTMLButtonElement | null;
   inventoryModal: HTMLElement | null;
   closeInventoryModal: HTMLButtonElement | null;
+  inventoryAutoSellToggle: HTMLButtonElement | null;
   mapGrid: HTMLElement | null;
   minerRing: HTMLElement | null;
   mapEnvironment: HTMLElement | null;
@@ -65,6 +66,7 @@ interface BindUiEventsArgs {
   closeResourceStatsPanel: () => void;
   setClassModalOpen: (isOpen: boolean) => void;
   setInventoryModalOpen: (isOpen: boolean) => void;
+  toggleInventoryAutoSell: () => void;
   activateTile: (tile: HTMLElement) => void;
   openMinerPanels: (minerIndex: number) => void;
   moveMinerToPointer: (clientX: number, clientY: number) => void;
@@ -115,6 +117,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     closeResourceStatsPanel,
     setClassModalOpen,
     setInventoryModalOpen,
+    toggleInventoryAutoSell,
     activateTile,
     openMinerPanels,
     moveMinerToPointer,
@@ -188,6 +191,10 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     ui.closeInventoryModal.addEventListener("click", () => {
       setInventoryModalOpen(false);
     });
+  }
+
+  if (ui.inventoryAutoSellToggle) {
+    ui.inventoryAutoSellToggle.addEventListener("click", toggleInventoryAutoSell);
   }
 
   if (ui.inventoryModal) {

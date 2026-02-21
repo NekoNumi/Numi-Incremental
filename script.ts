@@ -56,6 +56,7 @@ interface UIElements {
   inventoryToggle: HTMLButtonElement | null;
   inventoryModal: HTMLElement | null;
   closeInventoryModal: HTMLButtonElement | null;
+  inventoryAutoSellToggle: HTMLButtonElement | null;
   inventoryList: HTMLElement | null;
   upgradesAccordionBody: HTMLElement | null;
   toggleUpgradesAccordion: HTMLButtonElement | null;
@@ -184,6 +185,7 @@ interface UIElements {
 // State
 const state: GameState = {
   coins: 0,
+  autoSellEnabled: false,
   idleMinerOwned: 0,
   mapExpansions: 0,
   resources: [],
@@ -254,7 +256,7 @@ const fasterMinerUpgrade: UpgradeConfig = {
 const minerRadiusUpgrade: UpgradeConfig = {
   baseCost: 60,
   growth: 1.35,
-  radiusMultiplierPerLevel: 1.25,
+  radiusBonusPerLevel: 0.25,
 };
 
 state.resources = createDefaultResources();
@@ -329,6 +331,7 @@ const ui: UIElements = {
   inventoryToggle: document.getElementById("inventory-toggle") as HTMLButtonElement,
   inventoryModal: document.getElementById("inventory-modal"),
   closeInventoryModal: document.getElementById("close-inventory-modal") as HTMLButtonElement,
+  inventoryAutoSellToggle: document.getElementById("inventory-auto-sell-toggle") as HTMLButtonElement,
   inventoryList: document.getElementById("inventory-list"),
   upgradesAccordionBody: document.getElementById("upgrades-accordion-body"),
   toggleUpgradesAccordion: document.getElementById("toggle-upgrades-accordion") as HTMLButtonElement,
@@ -571,7 +574,7 @@ const {
   baseMinerEffectRadiusPx: BASE_MINER_EFFECT_RADIUS_PX,
   idleMinerTriggerIntervalSeconds: idleMiner.triggerIntervalSeconds || 5,
   fasterMinerBonusClicksPerSecond: fasterMinerUpgrade.bonusClicksPerSecond || 0.1,
-  minerRadiusMultiplierPerLevel: minerRadiusUpgrade.radiusMultiplierPerLevel || 1.25,
+  minerRadiusBonusPerLevel: minerRadiusUpgrade.radiusBonusPerLevel || 0.25,
   fasterMinerUpgrade,
   minerRadiusUpgrade,
   doubleActivationMinUpgrade,
@@ -650,6 +653,21 @@ function setInventoryModalOpen(isOpen: boolean): void {
     markAllInventoryDirty();
     renderInventoryModal();
   }
+}
+
+function renderInventoryAutoSellToggle(): void {
+  if (!ui.inventoryAutoSellToggle) {
+    return;
+  }
+
+  ui.inventoryAutoSellToggle.textContent = state.autoSellEnabled ? "Auto Sell: On" : "Auto Sell: Off";
+  ui.inventoryAutoSellToggle.setAttribute("aria-pressed", String(state.autoSellEnabled));
+}
+
+function toggleInventoryAutoSell(): void {
+  state.autoSellEnabled = !state.autoSellEnabled;
+  renderInventoryAutoSellToggle();
+  setStatus(state.autoSellEnabled ? "Auto Sell enabled." : "Auto Sell disabled.");
 }
 
 function renderInventoryModal(): void {
@@ -849,6 +867,12 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
   mapGrid: ui.mapGrid,
   addInventory: (ore, amount) => {
     addInventory(ore, amount);
+    if (state.autoSellEnabled) {
+      const soldCoins = sellInventory(ore, amount);
+      if (soldCoins > 0) {
+        state.coins += soldCoins;
+      }
+    }
     markInventoryDirty(ore);
   },
   getTileCoinValue,
@@ -1324,6 +1348,7 @@ function renderNow(): void {
   if (ui.goldGenerationStat) ui.goldGenerationStat.textContent = getOreGenerationStatText("gold");
   if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost);
   if (ui.sellAllResources) ui.sellAllResources.disabled = totalInventory <= 0;
+  renderInventoryAutoSellToggle();
 
   renderMap();
   renderUpgradesAccordion();
@@ -1359,6 +1384,7 @@ bindUiEvents({
   closeResourceStatsPanel,
   setClassModalOpen,
   setInventoryModalOpen,
+  toggleInventoryAutoSell,
   activateTile: (tile) => {
     activateTile(tile);
   },

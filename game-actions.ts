@@ -62,6 +62,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
   function resetGame(): void {
     clearSavedGame(saveKey);
     state.coins = 0;
+    state.autoSellEnabled = false;
     state.idleMinerOwned = 0;
     state.mapExpansions = 0;
     state.resources = createDefaultResources();

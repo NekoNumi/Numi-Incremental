@@ -27,7 +27,7 @@ interface CreateMinerLogicArgs {
   baseMinerEffectRadiusPx: number;
   idleMinerTriggerIntervalSeconds: number;
   fasterMinerBonusClicksPerSecond: number;
-  minerRadiusMultiplierPerLevel: number;
+  minerRadiusBonusPerLevel: number;
   fasterMinerUpgrade: UpgradeConfig;
   minerRadiusUpgrade: UpgradeConfig;
   doubleActivationMinUpgrade: UpgradeConfig;
@@ -117,7 +117,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     baseMinerEffectRadiusPx,
     idleMinerTriggerIntervalSeconds,
     fasterMinerBonusClicksPerSecond,
-    minerRadiusMultiplierPerLevel,
+    minerRadiusBonusPerLevel,
     fasterMinerUpgrade,
     minerRadiusUpgrade,
     doubleActivationMinUpgrade,
@@ -186,7 +186,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function getMinerEffectRadiusPx(minerIndex: number): number {
     const upgrade = getMinerUpgrade(minerIndex);
-    return baseMinerEffectRadiusPx * minerRadiusMultiplierPerLevel ** upgrade.radiusLevel;
+    return baseMinerEffectRadiusPx * (1 + upgrade.radiusLevel * minerRadiusBonusPerLevel);
   }
 
   function getDoubleActivationMinCost(minerIndex: number): number {
@@ -319,10 +319,9 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function getMinerRadiusStatText(minerIndex: number): string {
     const upgrade = getMinerUpgrade(minerIndex);
-    const nextRadius = upgrade.radiusLevel + 1;
-    const currentMultiplier = (minerRadiusMultiplierPerLevel ** upgrade.radiusLevel).toFixed(2);
-    const nextMultiplier = (minerRadiusMultiplierPerLevel ** nextRadius).toFixed(2);
-    return `Current: ${currentMultiplier}x radius → Upgrading to: ${nextMultiplier}x radius`;
+    const currentRadius = Math.round(getMinerEffectRadiusPx(minerIndex));
+    const nextRadius = Math.round(baseMinerEffectRadiusPx * (1 + (upgrade.radiusLevel + 1) * minerRadiusBonusPerLevel));
+    return `Current: ${currentRadius}px radius → Upgrading to: ${nextRadius}px radius`;
   }
 
   function getDoubleActivationMinStatText(minerIndex: number): string {
@@ -445,7 +444,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     const current = (getCritChance(minerIndex) * 100).toFixed(0);
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
-    const next = (Math.min(0.5, (level + 1) * 0.03) * 100).toFixed(0);
+    const next = (Math.min(0.6, 0.1 + (level + 1) * 0.03) * 100).toFixed(0);
     return `Current chance: ${current}% → Upgrading to: ${next}%`;
   }
 

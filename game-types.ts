@@ -40,7 +40,7 @@ export interface UpgradeConfig {
   growth: number;
   bonusClicksPerSecond?: number;
   triggerIntervalSeconds?: number;
-  radiusMultiplierPerLevel?: number;
+  radiusBonusPerLevel?: number;
 }
 
 export interface ResourceConfig {
@@ -57,6 +57,7 @@ export type ResourceInventory = Record<OreType, number>;
 
 export interface GameState {
   coins: number;
+  autoSellEnabled: boolean;
   idleMinerOwned: number;
   mapExpansions: number;
   resources: ResourceConfig[];
