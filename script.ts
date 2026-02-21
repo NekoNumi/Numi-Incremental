@@ -1276,7 +1276,7 @@ function toggleRepositionWorkerPicker(): void {
   }
 
   const previousMinerIndex = getCurrentRepositionMinerIndex();
-  if (interactionState.placementMode && previousMinerIndex !== null && placementOriginalPosition) {
+  if (interactionState.placementMode && previousMinerIndex !== null && placementOriginalPosition && !placementCandidateSet) {
     state.idleMinerPositions[previousMinerIndex] = {
       x: placementOriginalPosition.x,
       y: placementOriginalPosition.y,

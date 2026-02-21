@@ -4,7 +4,10 @@
   "notes": [
     "Worker menu render optimization.",
     "Added better map scaling for mobile",
-    "Capped worker quantity at 9"
+    "Capped worker quantity at 9",
+    "Attempt to fix tile flickering when activating a tile on mobile.",
+    "Fixed issue with select worker not saving position of last selected worker.",
+    "Fixed jitter with worker placement on mobile. \n- Worker snaps to grid cell but then can be dragged to exact placement."
 
   ]
 }

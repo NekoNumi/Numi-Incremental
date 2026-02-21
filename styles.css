@@ -534,6 +534,10 @@ strong {
   font-size: 0.9rem;
 }
 
+.dev-log-notes li {
+  white-space: pre-line;
+}
+
 .modal-actions {
   display: grid;
   gap: 0.55rem;
