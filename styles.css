@@ -494,6 +494,43 @@ strong {
   color: #9bbdeb;
 }
 
+.dev-log-modal-card {
+  width: min(680px, 92vw);
+  min-height: auto;
+  max-height: min(82vh, 760px);
+}
+
+.dev-log-body {
+  overflow-y: auto;
+}
+
+.dev-log-accordion {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.dev-log-entry {
+  border: 1px solid #2b3550;
+  border-radius: 10px;
+  background: #182239;
+  padding: 0.5rem 0.65rem;
+}
+
+.dev-log-entry-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #d4e8ff;
+}
+
+.dev-log-notes {
+  margin: 0.45rem 0 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.25rem;
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
 .modal-actions {
   display: grid;
   gap: 0.55rem;
@@ -1180,7 +1217,8 @@ button:disabled {
   #inventory-modal,
   #upgrades-modal,
   #workers-modal,
-  #settings-modal {
+  #settings-modal,
+  #dev-log-modal {
     place-items: stretch;
     z-index: 30;
   }
@@ -1188,14 +1226,16 @@ button:disabled {
   #inventory-modal .modal-backdrop,
   #upgrades-modal .modal-backdrop,
   #workers-modal .modal-backdrop,
-  #settings-modal .modal-backdrop {
+  #settings-modal .modal-backdrop,
+  #dev-log-modal .modal-backdrop {
     display: none;
   }
 
   #inventory-modal .modal-card,
   #upgrades-modal .modal-card,
   #workers-modal .modal-card,
-  #settings-modal .modal-card {
+  #settings-modal .modal-card,
+  #dev-log-modal .modal-card {
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -1215,10 +1255,18 @@ button:disabled {
   }
 
   #settings-modal .modal-actions button,
-  #settings-modal #toggle-left-handed-mode {
+  #settings-modal #toggle-left-handed-mode,
+  #settings-modal #open-dev-log,
+  #settings-modal #check-for-updates {
     width: 100%;
     min-width: 0;
     text-align: center;
+  }
+
+  #dev-log-modal .modal-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
   #inventory-modal .modal-body {
