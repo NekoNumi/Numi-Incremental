@@ -163,6 +163,18 @@ strong {
   gap: 0.8rem;
 }
 
+.worker-details-modal-body {
+  display: grid;
+  gap: 0.8rem;
+  overflow-y: auto;
+}
+
+.worker-details-panel-host {
+  display: grid;
+  gap: 0.7rem;
+  width: 100%;
+}
+
 .workers-section {
   display: grid;
   gap: 0.55rem;
@@ -201,19 +213,57 @@ strong {
 }
 
 .workers-panel-host .miner-stats-panel {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  width: 100%;
   margin-bottom: 0;
 }
 
 .workers-panel-host .miner-popup {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  width: 100%;
   margin-top: 0;
   padding-top: 0;
   border-top: none;
 }
 
-  .workers-panel-host #close-miner-stats,
-  .workers-panel-host #close-miner-popup {
-    display: none;
-  }
+.worker-details-panel-host .miner-stats-panel {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0;
+}
+
+.worker-details-panel-host #miner-stats-panel.left-side-menu {
+  width: 100%;
+  max-width: 100%;
+}
+
+.worker-details-panel-host .miner-popup {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  width: 100%;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.workers-panel-host #close-miner-stats,
+.workers-panel-host #close-miner-popup,
+.worker-details-panel-host #close-miner-stats,
+.worker-details-panel-host #close-miner-popup {
+  display: none;
+}
 
 .upgrades-modal-body {
   display: grid;
@@ -294,11 +344,20 @@ strong {
     pointer-events: none;
   }
 
+  #worker-details-modal {
+    place-items: stretch end;
+    pointer-events: none;
+  }
+
   #inventory-modal .modal-backdrop {
     display: none;
   }
 
   #upgrades-modal .modal-backdrop {
+    display: none;
+  }
+
+  #worker-details-modal .modal-backdrop {
     display: none;
   }
 
@@ -322,11 +381,25 @@ strong {
     pointer-events: auto;
   }
 
+  #worker-details-modal .worker-details-modal-card {
+    width: min(460px, 92vw);
+    max-width: 460px;
+    min-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    border-radius: 12px 0 0 12px;
+    pointer-events: auto;
+  }
+
   #inventory-modal .modal-body {
     overflow-y: auto;
   }
 
   #upgrades-modal .modal-body {
+    overflow-y: auto;
+  }
+
+  #worker-details-modal .modal-body {
     overflow-y: auto;
   }
 
@@ -350,6 +423,14 @@ strong {
   }
 
   body.left-handed-mode #upgrades-modal .upgrades-modal-card {
+    border-radius: 0 12px 12px 0;
+  }
+
+  body.left-handed-mode #worker-details-modal {
+    place-items: stretch start;
+  }
+
+  body.left-handed-mode #worker-details-modal .worker-details-modal-card {
     border-radius: 0 12px 12px 0;
   }
 

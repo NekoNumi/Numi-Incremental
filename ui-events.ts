@@ -19,6 +19,8 @@ interface UiRefs {
   workersToggleMobile: HTMLButtonElement | null;
   workersModal: HTMLElement | null;
   closeWorkersModal: HTMLButtonElement | null;
+  workerDetailsModal: HTMLElement | null;
+  closeWorkerDetailsModalButton: HTMLButtonElement | null;
   workersList: HTMLElement | null;
   inventoryModal: HTMLElement | null;
   upgradesModal: HTMLElement | null;
@@ -322,6 +324,10 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     });
   }
 
+  if (ui.closeWorkerDetailsModalButton) {
+    ui.closeWorkerDetailsModalButton.addEventListener("click", closeMinerPanels);
+  }
+
   if (ui.workersModal) {
     ui.workersModal.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
@@ -332,6 +338,19 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
         return;
       }
       setWorkersModalOpen(false);
+    });
+  }
+
+  if (ui.workerDetailsModal) {
+    ui.workerDetailsModal.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.closest(".modal-card")) {
+        return;
+      }
+      closeMinerPanels();
     });
   }
 

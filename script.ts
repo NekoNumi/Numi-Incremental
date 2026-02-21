@@ -79,8 +79,12 @@ interface UIElements {
   mobileFooter: HTMLElement | null;
   workersModal: HTMLElement | null;
   closeWorkersModal: HTMLButtonElement | null;
+  workerDetailsModal: HTMLElement | null;
+  workerDetailsTitle: HTMLElement | null;
+  closeWorkerDetailsModalButton: HTMLButtonElement | null;
   workersList: HTMLElement | null;
   workersPanelHost: HTMLElement | null;
+  workerDetailsPanelHost: HTMLElement | null;
   inventoryModal: HTMLElement | null;
   upgradesModal: HTMLElement | null;
   closeInventoryModal: HTMLButtonElement | null;
@@ -459,8 +463,12 @@ const ui: UIElements = {
   mobileFooter: document.querySelector(".mobile-footer"),
   workersModal: document.getElementById("workers-modal"),
   closeWorkersModal: document.getElementById("close-workers-modal") as HTMLButtonElement,
+  workerDetailsModal: document.getElementById("worker-details-modal"),
+  workerDetailsTitle: document.getElementById("worker-details-title"),
+  closeWorkerDetailsModalButton: document.getElementById("close-worker-details-modal") as HTMLButtonElement,
   workersList: document.getElementById("workers-list"),
   workersPanelHost: document.getElementById("workers-panel-host"),
+  workerDetailsPanelHost: document.getElementById("worker-details-panel-host"),
   inventoryModal: document.getElementById("inventory-modal"),
   upgradesModal: document.getElementById("upgrades-modal"),
   closeInventoryModal: document.getElementById("close-inventory-modal") as HTMLButtonElement,
@@ -929,6 +937,14 @@ function attachMinerPanelsToWorkersHost(): void {
   ui.workersPanelHost.append(ui.minerStatsPanel, ui.minerPopup);
 }
 
+function attachMinerPanelsToWorkerDetailsHost(): void {
+  if (!ui.workerDetailsPanelHost || !ui.minerStatsPanel || !ui.minerPopup) {
+    return;
+  }
+
+  ui.workerDetailsPanelHost.append(ui.minerStatsPanel, ui.minerPopup);
+}
+
 function restoreMinerPanelsToMap(): void {
   if (!ui.minerStatsHost || !ui.minerPopupHost || !ui.minerStatsPanel || !ui.minerPopup) {
     return;
@@ -936,6 +952,34 @@ function restoreMinerPanelsToMap(): void {
 
   ui.minerStatsHost.appendChild(ui.minerStatsPanel);
   ui.minerPopupHost.appendChild(ui.minerPopup);
+}
+
+function setWorkerDetailsModalOpen(isOpen: boolean): void {
+  if (!ui.workerDetailsModal) {
+    return;
+  }
+
+  const shouldOpen = isOpen && !isMobileViewport();
+  ui.workerDetailsModal.classList.toggle("hidden", !shouldOpen);
+  ui.workerDetailsModal.setAttribute("aria-hidden", String(!shouldOpen));
+
+  if (ui.workerDetailsTitle) {
+    const minerIndex = interactionState.selectedMinerIndex;
+    ui.workerDetailsTitle.textContent =
+      shouldOpen && minerIndex !== null && minerIndex >= 0 && minerIndex < state.idleMinerOwned
+        ? getMinerDisplayName(minerIndex)
+        : "Worker";
+  }
+
+  if (shouldOpen) {
+    attachMinerPanelsToWorkerDetailsHost();
+    return;
+  }
+
+  const workersModalOpen = !!ui.workersModal && !ui.workersModal.classList.contains("hidden");
+  if (!workersModalOpen) {
+    restoreMinerPanelsToMap();
+  }
 }
 
 function renderWorkersList(): void {
@@ -1146,6 +1190,9 @@ function setUpgradesModalOpen(isOpen: boolean): void {
     setSettingsModalOpen(false);
     suppressSettingsRestore = false;
     setWorkersModalOpen(false);
+  }
+  if (isOpen && !isMobileViewport()) {
+    closeMinerPanels();
   }
   ui.upgradesModal.classList.toggle("hidden", !isOpen);
   ui.upgradesModal.setAttribute("aria-hidden", String(!isOpen));
@@ -1420,13 +1467,13 @@ function renderUpgradesAccordion(): void {
 const {
   setSettingsModalOpen: setSettingsModalOpenBase,
   setClassModalOpen,
-  openMinerPanels,
+  openMinerPanels: openMinerPanelsBase,
   toggleResourceStatsPanel,
   closeResourceStatsPanel,
   toggleUpgradesAccordion,
   closeMinerUpgradePanel,
   closeMinerStatsPanel,
-  closeMinerPanels,
+  closeMinerPanels: closeMinerPanelsBase,
 } = createUiPanelControls({
   ui,
   interactionState,
@@ -1449,6 +1496,21 @@ function setSettingsModalOpen(isOpen: boolean): void {
     restoringMobilePageFromSettings = true;
     setMobilePage(lastMobilePageBeforeSettings);
     restoringMobilePageFromSettings = false;
+  }
+}
+
+function openMinerPanels(minerIndex: number): void {
+  if (!isMobileViewport()) {
+    setUpgradesModalOpen(false);
+    setWorkerDetailsModalOpen(true);
+  }
+  openMinerPanelsBase(minerIndex);
+}
+
+function closeMinerPanels(): void {
+  closeMinerPanelsBase();
+  if (!isMobileViewport()) {
+    setWorkerDetailsModalOpen(false);
   }
 }
 
@@ -2294,6 +2356,22 @@ function renderNow(): void {
     } else {
       attachMinerPanelsToWorkersHost();
       renderWorkersList();
+    }
+  }
+
+  const isWorkerDetailsModalOpen = !!ui.workerDetailsModal && !ui.workerDetailsModal.classList.contains("hidden");
+  if (isWorkerDetailsModalOpen) {
+    if (isMobileViewport()) {
+      setWorkerDetailsModalOpen(false);
+    } else {
+      attachMinerPanelsToWorkerDetailsHost();
+      if (ui.workerDetailsTitle) {
+        const minerIndex = interactionState.selectedMinerIndex;
+        ui.workerDetailsTitle.textContent =
+          minerIndex !== null && minerIndex >= 0 && minerIndex < state.idleMinerOwned
+            ? getMinerDisplayName(minerIndex)
+            : "Worker";
+      }
     }
   }
 
