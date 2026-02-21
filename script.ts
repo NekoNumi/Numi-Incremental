@@ -1015,16 +1015,9 @@ function setUpdateReadyState(): void {
 }
 
 function checkForUpdate(showStatusWhenUpToDate = false): void {
-  console.log("[updates] check started", {
-    showStatusWhenUpToDate,
-    hasRegistration: !!serviceWorkerRegistration,
-    updateReadyToReload,
-  });
-
   if (!serviceWorkerRegistration) {
     updateCheckedUpToDate = false;
     setCurrentVersionText();
-    console.log("[updates] check unavailable: no service worker registration");
     if (showStatusWhenUpToDate) {
       setStatus("Update check is unavailable.");
     }
@@ -1034,20 +1027,14 @@ function checkForUpdate(showStatusWhenUpToDate = false): void {
   serviceWorkerRegistration
     .update()
     .then(() => {
-      console.log("[updates] service worker update() completed", {
-        hasWaitingWorker: !!serviceWorkerRegistration?.waiting,
-      });
-
       if (serviceWorkerRegistration?.waiting) {
         setUpdateReadyState();
-        console.log("[updates] update available and waiting to activate");
         promptForUpdateReload();
         return;
       }
 
       updateCheckedUpToDate = showStatusWhenUpToDate;
       setCurrentVersionText();
-      console.log("[updates] app is on current version");
 
       if (showStatusWhenUpToDate) {
         setStatus("Updated to current version.");
@@ -1056,7 +1043,6 @@ function checkForUpdate(showStatusWhenUpToDate = false): void {
     .catch(() => {
       updateCheckedUpToDate = false;
       setCurrentVersionText();
-      console.log("[updates] check failed");
       if (showStatusWhenUpToDate) {
         setStatus("Unable to check for updates right now.");
       }
@@ -1074,26 +1060,18 @@ function checkForUpdateOnceOnFocusOrOpen(): void {
 
 function monitorServiceWorkerRegistration(registration: ServiceWorkerRegistration): void {
   serviceWorkerRegistration = registration;
-  console.log("[updates] service worker registration ready", {
-    hasWaitingWorker: !!registration.waiting,
-  });
 
   if (registration.waiting) {
     setUpdateReadyState();
   }
 
   registration.addEventListener("updatefound", () => {
-    console.log("[updates] updatefound event fired");
     const installing = registration.installing;
     if (!installing) {
       return;
     }
 
     installing.addEventListener("statechange", () => {
-      console.log("[updates] installing state changed", {
-        state: installing.state,
-        hasController: !!navigator.serviceWorker.controller,
-      });
       if (installing.state === "installed" && navigator.serviceWorker.controller) {
         setUpdateReadyState();
         setStatus("A new update is ready.");

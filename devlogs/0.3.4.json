@@ -1,0 +1,8 @@
+{
+  "version": "Version 0.3.4",
+  "releaseId": "0.3.4",
+  "notes": [
+    "Removed temporary service worker update debug logging from production.",
+    "Refined update status messaging in Settings (Up to Date / Update available)."
+  ]
+}
