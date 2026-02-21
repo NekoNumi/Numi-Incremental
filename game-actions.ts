@@ -29,6 +29,11 @@ export function createGameActions(args: CreateGameActionsArgs): {
   buyIronGeneration: () => void;
   buySilverGeneration: () => void;
   buyGoldGeneration: () => void;
+  buySapphireGeneration: () => void;
+  buyRubyGeneration: () => void;
+  buyEmeraldGeneration: () => void;
+  buyDiamondGeneration: () => void;
+  buyAmethystGeneration: () => void;
 } {
   const {
     state,
@@ -125,6 +130,26 @@ export function createGameActions(args: CreateGameActionsArgs): {
     buyOreGeneration("gold");
   }
 
+  function buySapphireGeneration(): void {
+    buyOreGeneration("sapphire");
+  }
+
+  function buyRubyGeneration(): void {
+    buyOreGeneration("ruby");
+  }
+
+  function buyEmeraldGeneration(): void {
+    buyOreGeneration("emerald");
+  }
+
+  function buyDiamondGeneration(): void {
+    buyOreGeneration("diamond");
+  }
+
+  function buyAmethystGeneration(): void {
+    buyOreGeneration("amethyst");
+  }
+
   return {
     buyIdleMiner,
     resetGame,
@@ -134,5 +159,10 @@ export function createGameActions(args: CreateGameActionsArgs): {
     buyIronGeneration,
     buySilverGeneration,
     buyGoldGeneration,
+    buySapphireGeneration,
+    buyRubyGeneration,
+    buyEmeraldGeneration,
+    buyDiamondGeneration,
+    buyAmethystGeneration,
   };
 }

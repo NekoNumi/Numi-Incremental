@@ -16,14 +16,17 @@ interface InventoryItemState {
 
 interface ResourceLegendRowRefs {
   name: HTMLElement;
+  nameLabel: HTMLElement;
   chance: HTMLElement;
   value: HTMLElement;
   inventory: HTMLElement;
   sellButton: HTMLButtonElement;
 }
 
-const INVENTORY_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
-const UPGRADABLE_ORES: UpgradableOre[] = ["coal", "copper", "iron", "silver", "gold"];
+const INVENTORY_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold", "amethyst", "sapphire", "emerald", "ruby", "diamond"];
+const NORMAL_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
+const UPGRADABLE_ORES: UpgradableOre[] = INVENTORY_ORES.slice(1) as UpgradableOre[];
+const GEM_ORES: UpgradableOre[] = ["amethyst", "sapphire", "emerald", "ruby", "diamond"];
 
 export function createResourceLogic(args: CreateResourceLogicArgs): {
   getResourceByOre: (ore: OreType) => ResourceConfig;
@@ -53,6 +56,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
 
   const legendDirtyOres = new Set<OreType>(INVENTORY_ORES);
   const legendRowRefs: Partial<Record<OreType, ResourceLegendRowRefs>> = {};
+  let gemstoneSummaryRefs: ResourceLegendRowRefs | null = null;
 
   function markLegendDirty(ore: OreType): void {
     legendDirtyOres.add(ore);
@@ -65,13 +69,10 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
   }
 
   const inventoryItems: Record<OreType, InventoryItemState> = {
-    sand: { confirmed: Math.max(0, Math.floor(Number(inventorySource.sand) || 0)), pending: 0 },
-    coal: { confirmed: Math.max(0, Math.floor(Number(inventorySource.coal) || 0)), pending: 0 },
-    copper: { confirmed: Math.max(0, Math.floor(Number(inventorySource.copper) || 0)), pending: 0 },
-    iron: { confirmed: Math.max(0, Math.floor(Number(inventorySource.iron) || 0)), pending: 0 },
-    silver: { confirmed: Math.max(0, Math.floor(Number(inventorySource.silver) || 0)), pending: 0 },
-    gold: { confirmed: Math.max(0, Math.floor(Number(inventorySource.gold) || 0)), pending: 0 },
-  };
+    ...Object.fromEntries(
+      INVENTORY_ORES.map((ore) => [ore, { confirmed: Math.max(0, Math.floor(Number(inventorySource[ore]) || 0)), pending: 0 }])
+    ),
+  } as Record<OreType, InventoryItemState>;
 
   function ensureInventorySource(): void {
     if (state.inventory === inventorySource) {
@@ -136,6 +137,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
 
     return {
       ore,
+      type: ore === "sand" || ore === "coal" ? "stone" : ore === "copper" || ore === "iron" || ore === "silver" || ore === "gold" ? "metal" : "gem",
       name: ore.charAt(0).toUpperCase() + ore.slice(1),
       weight: 0,
       value: 1,
@@ -173,7 +175,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
       return getResourceByOre("sand").weight;
     }
 
-    const level = getOreGenerationLevel(ore as UpgradableOre);
+    const level = getOreGenerationLevel(ore);
     return level > 0 ? getResourceByOre(ore).weight : 0;
   }
 
@@ -199,14 +201,16 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
   }
 
   function buildRedistributedWeightMap(overrides?: Partial<Record<UpgradableOre, number>>): Record<OreType, number> {
-    const redistributed: Record<OreType, number> = {
-      sand: getUnlockedBaseWeight("sand"),
-      coal: getUnlockedBaseWeightForLevel("coal", getLevelForOre("coal", overrides)),
-      copper: getUnlockedBaseWeightForLevel("copper", getLevelForOre("copper", overrides)),
-      iron: getUnlockedBaseWeightForLevel("iron", getLevelForOre("iron", overrides)),
-      silver: getUnlockedBaseWeightForLevel("silver", getLevelForOre("silver", overrides)),
-      gold: getUnlockedBaseWeightForLevel("gold", getLevelForOre("gold", overrides)),
-    };
+    const redistributed = {} as Record<OreType, number>;
+
+    for (const ore of INVENTORY_ORES) {
+      if (ore === "sand") {
+        redistributed[ore] = getUnlockedBaseWeight("sand");
+        continue;
+      }
+
+      redistributed[ore] = getUnlockedBaseWeightForLevel(ore, getLevelForOre(ore, overrides));
+    }
 
     for (let index = 1; index < INVENTORY_ORES.length; index += 1) {
       const ore = INVENTORY_ORES[index];
@@ -216,7 +220,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
         continue;
       }
 
-      const baseUnlockedWeight = getUnlockedBaseWeight(ore);
+      const baseUnlockedWeight = getUnlockedBaseWeightForLevel(ore, level);
       const targetWeight = getOreWeightForLevel(ore, level);
       const bonusToAdd = Math.max(0, targetWeight - baseUnlockedWeight);
       if (bonusToAdd <= 0) {
@@ -261,26 +265,47 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     return nextWeight <= maxSupportedWeight;
   }
 
+  function buildEffectiveWeightMap(overrides?: Partial<Record<UpgradableOre, number>>): Record<OreType, number> {
+    const redistributed = buildRedistributedWeightMap(overrides);
+    const effective = { ...redistributed };
+
+    const gemstoneWeight = GEM_ORES.reduce((sum, ore) => sum + redistributed[ore], 0);
+    if (gemstoneWeight <= 0) {
+      return effective;
+    }
+
+    const equalGemShare = gemstoneWeight / GEM_ORES.length;
+
+    for (const ore of GEM_ORES) {
+      effective[ore] = equalGemShare;
+    }
+
+    return effective;
+  }
+
   function getOreEffectiveWeight(ore: OreType): number {
-    const redistributed = buildRedistributedWeightMap();
-    return redistributed[ore] || 0;
+    const effective = buildEffectiveWeightMap();
+    return effective[ore] || 0;
   }
 
   function getWeightedRoll(boostedOre: UpgradableOre | null, qualityMultiplier: number): OreType {
-    const weights: Array<{ ore: OreType; weight: number }> = [
-      { ore: "sand", weight: getOreEffectiveWeight("sand") },
-      { ore: "coal", weight: getOreEffectiveWeight("coal") },
-      { ore: "copper", weight: getOreEffectiveWeight("copper") },
-      { ore: "iron", weight: getOreEffectiveWeight("iron") },
-      { ore: "silver", weight: getOreEffectiveWeight("silver") },
-      { ore: "gold", weight: getOreEffectiveWeight("gold") },
+    const effectiveWeights = buildEffectiveWeightMap();
+    const gemstonePoolWeight = GEM_ORES.reduce((sum, ore) => sum + (effectiveWeights[ore] || 0), 0);
+    const weights: Array<{ ore: OreType | "gemstone-pool"; weight: number }> = [
+      ...NORMAL_ORES.map((ore) => ({ ore, weight: effectiveWeights[ore] || 0 })),
+      { ore: "gemstone-pool", weight: gemstonePoolWeight },
     ];
 
     if (boostedOre) {
-      for (const entry of weights) {
-        if (entry.ore === boostedOre) {
-          entry.weight *= qualityMultiplier;
-          break;
+      if (GEM_ORES.includes(boostedOre)) {
+        const poolEntry = weights.find((entry) => entry.ore === "gemstone-pool");
+        if (poolEntry) {
+          poolEntry.weight *= qualityMultiplier;
+        }
+      } else {
+        const targetEntry = weights.find((entry) => entry.ore === boostedOre);
+        if (targetEntry) {
+          targetEntry.weight *= qualityMultiplier;
         }
       }
     }
@@ -291,6 +316,10 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     for (const entry of weights) {
       roll -= entry.weight;
       if (roll <= 0) {
+        if (entry.ore === "gemstone-pool") {
+          const randomGemIndex = Math.floor(Math.random() * GEM_ORES.length);
+          return GEM_ORES[randomGemIndex];
+        }
         return entry.ore;
       }
     }
@@ -367,33 +396,67 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     if (!legendInitialized) {
       resourceLegendBody.innerHTML = "";
 
-      for (const ore of INVENTORY_ORES) {
+      const createLegendRow = (ore: OreType | "gemstone", sellable: boolean): ResourceLegendRowRefs => {
         const row = document.createElement("p");
         row.className = "resource-legend-row";
 
         const nameNode = document.createElement("span");
+        const nameLabel = document.createElement("span");
+        const tilePreview = document.createElement("span");
         const chanceNode = document.createElement("span");
         const valueNode = document.createElement("span");
         const inventoryNode = document.createElement("span");
         const sellNode = document.createElement("span");
         const sellButton = document.createElement("button");
 
+        nameNode.className = "resource-legend-name";
+        nameLabel.className = "resource-legend-name-label";
+        tilePreview.className = "resource-legend-tile map-tile";
+        if (ore === "gemstone") {
+          tilePreview.classList.add("resource-legend-tile--gemstone");
+        } else if (ore !== "sand") {
+          tilePreview.classList.add(`map-tile--${ore}`);
+        }
+        tilePreview.setAttribute("aria-hidden", "true");
+        nameNode.append(tilePreview, nameLabel);
+
         sellButton.type = "button";
         sellButton.className = "resource-sell-btn";
-        sellButton.dataset.ore = ore;
-        sellButton.textContent = "Sell 1";
+        if (sellable) {
+          sellButton.dataset.ore = ore;
+          sellButton.textContent = "Sell 1";
+        } else {
+          sellButton.disabled = true;
+          sellButton.textContent = "-";
+        }
 
         sellNode.appendChild(sellButton);
         row.append(nameNode, chanceNode, valueNode, inventoryNode, sellNode);
         resourceLegendBody.appendChild(row);
 
-        legendRowRefs[ore] = {
+        return {
           name: nameNode,
+          nameLabel,
           chance: chanceNode,
           value: valueNode,
           inventory: inventoryNode,
           sellButton,
         };
+      };
+
+      for (const ore of NORMAL_ORES) {
+        legendRowRefs[ore] = createLegendRow(ore, true);
+      }
+
+      gemstoneSummaryRefs = createLegendRow("gemstone", false);
+
+      const gemstoneSectionRow = document.createElement("p");
+      gemstoneSectionRow.className = "resource-legend-section-row";
+      gemstoneSectionRow.textContent = "Gemstone Split";
+      resourceLegendBody.appendChild(gemstoneSectionRow);
+
+      for (const ore of GEM_ORES) {
+        legendRowRefs[ore] = createLegendRow(ore, true);
       }
 
       legendInitialized = true;
@@ -404,10 +467,12 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
       return;
     }
 
-    const weights = INVENTORY_ORES.map((ore) => ({ ore, weight: getOreEffectiveWeight(ore) }));
+    const effectiveWeights = buildEffectiveWeightMap();
+    const weights = INVENTORY_ORES.map((ore) => ({ ore, weight: effectiveWeights[ore] || 0 }));
     const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+    const gemstoneWeight = GEM_ORES.reduce((sum, ore) => sum + (effectiveWeights[ore] || 0), 0);
 
-    for (const ore of legendDirtyOres) {
+    for (const ore of NORMAL_ORES) {
       const refs = legendRowRefs[ore];
       if (!refs) {
         continue;
@@ -416,7 +481,32 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
       const weight = weights.find((entry) => entry.ore === ore)?.weight || 0;
       const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
 
-      refs.name.textContent = getOreDisplayName(ore);
+      refs.nameLabel.textContent = getOreDisplayName(ore);
+      refs.chance.textContent = `${getChanceText(chancePercent)}%`;
+      refs.value.textContent = getTileCoinValue(ore).toString();
+      refs.inventory.textContent = getInventoryAmount(ore).toString();
+      refs.sellButton.dataset.ore = ore;
+    }
+
+    if (gemstoneSummaryRefs) {
+      const gemstoneChancePercent = totalWeight > 0 ? (gemstoneWeight / totalWeight) * 100 : 0;
+      const gemstoneInventory = GEM_ORES.reduce((sum, ore) => sum + getInventoryAmount(ore), 0);
+      gemstoneSummaryRefs.nameLabel.textContent = "Gemstone";
+      gemstoneSummaryRefs.chance.textContent = `${getChanceText(gemstoneChancePercent)}%`;
+      gemstoneSummaryRefs.value.textContent = "-";
+      gemstoneSummaryRefs.inventory.textContent = gemstoneInventory.toLocaleString();
+    }
+
+    for (const ore of GEM_ORES) {
+      const refs = legendRowRefs[ore];
+      if (!refs) {
+        continue;
+      }
+
+      const weight = weights.find((entry) => entry.ore === ore)?.weight || 0;
+      const chancePercent = gemstoneWeight > 0 ? (weight / gemstoneWeight) * 100 : 0;
+
+      refs.nameLabel.textContent = getOreDisplayName(ore);
       refs.chance.textContent = `${getChanceText(chancePercent)}%`;
       refs.value.textContent = getTileCoinValue(ore).toString();
       refs.inventory.textContent = getInventoryAmount(ore).toString();

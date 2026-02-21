@@ -1,4 +1,10 @@
-import type { UnitSpecialization } from "./game-types";
+import type { OreType, UnitSpecialization } from "./game-types";
+
+const SELLABLE_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold", "sapphire", "ruby", "emerald", "diamond", "amethyst"];
+
+function isSellableOre(value: unknown): value is OreType {
+  return typeof value === "string" && SELLABLE_ORES.includes(value as OreType);
+}
 
 interface UiRefs {
   settingsToggle: HTMLElement | null;
@@ -28,12 +34,20 @@ interface UiRefs {
   buyIronGeneration: HTMLButtonElement | null;
   buySilverGeneration: HTMLButtonElement | null;
   buyGoldGeneration: HTMLButtonElement | null;
+  buyGemstoneGeneration: HTMLButtonElement | null;
+  buySapphireGeneration: HTMLButtonElement | null;
+  buyRubyGeneration: HTMLButtonElement | null;
+  buyEmeraldGeneration: HTMLButtonElement | null;
+  buyDiamondGeneration: HTMLButtonElement | null;
+  buyAmethystGeneration: HTMLButtonElement | null;
   popupUpgradeDoubleActivationMin: HTMLButtonElement | null;
   popupUpgradeDoubleActivationMax: HTMLButtonElement | null;
   popupUpgradeVeinFinder: HTMLButtonElement | null;
   popupUpgradeCritChance: HTMLButtonElement | null;
   popupUpgradeCritMultiplier: HTMLButtonElement | null;
   popupUpgradeChainReaction: HTMLButtonElement | null;
+  popupUpgradeMetalBias: HTMLButtonElement | null;
+  popupUpgradeElectricEfficiency: HTMLButtonElement | null;
   popupUpgradeEnchantBountiful: HTMLButtonElement | null;
   popupUpgradeEnchantBountifulMin: HTMLButtonElement | null;
   popupUpgradeEnchantBountifulMax: HTMLButtonElement | null;
@@ -85,8 +99,14 @@ interface BindUiEventsArgs {
   buyIronGeneration: () => void;
   buySilverGeneration: () => void;
   buyGoldGeneration: () => void;
-  sellOneResource: (ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold") => void;
-  sellAllByResource: (ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold") => void;
+  buyGemstoneGeneration: () => void;
+  buySapphireGeneration: () => void;
+  buyRubyGeneration: () => void;
+  buyEmeraldGeneration: () => void;
+  buyDiamondGeneration: () => void;
+  buyAmethystGeneration: () => void;
+  sellOneResource: (ore: OreType) => void;
+  sellAllByResource: (ore: OreType) => void;
   sellAllResources: () => void;
   buyDoubleActivationMin: () => void;
   buyDoubleActivationMax: () => void;
@@ -94,6 +114,8 @@ interface BindUiEventsArgs {
   buyCritChanceUpgrade: () => void;
   buyCritMultiplierUpgrade: () => void;
   buyChainReactionUpgrade: () => void;
+  buyMetalBiasUpgrade: () => void;
+  buyElectricEfficiencyUpgrade: () => void;
   buyEnchantBountifulUpgrade: () => void;
   buyEnchantBountifulMinUpgrade: () => void;
   buyEnchantBountifulMaxUpgrade: () => void;
@@ -136,6 +158,12 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     buyIronGeneration,
     buySilverGeneration,
     buyGoldGeneration,
+    buyGemstoneGeneration,
+    buySapphireGeneration,
+    buyRubyGeneration,
+    buyEmeraldGeneration,
+    buyDiamondGeneration,
+    buyAmethystGeneration,
     sellOneResource,
     sellAllByResource,
     sellAllResources,
@@ -145,6 +173,8 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     buyCritChanceUpgrade,
     buyCritMultiplierUpgrade,
     buyChainReactionUpgrade,
+    buyMetalBiasUpgrade,
+    buyElectricEfficiencyUpgrade,
     buyEnchantBountifulUpgrade,
     buyEnchantBountifulMinUpgrade,
     buyEnchantBountifulMaxUpgrade,
@@ -296,6 +326,12 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.buyIronGeneration) ui.buyIronGeneration.addEventListener("click", buyIronGeneration);
   if (ui.buySilverGeneration) ui.buySilverGeneration.addEventListener("click", buySilverGeneration);
   if (ui.buyGoldGeneration) ui.buyGoldGeneration.addEventListener("click", buyGoldGeneration);
+  if (ui.buyGemstoneGeneration) ui.buyGemstoneGeneration.addEventListener("click", buyGemstoneGeneration);
+  if (ui.buySapphireGeneration) ui.buySapphireGeneration.addEventListener("click", buySapphireGeneration);
+  if (ui.buyRubyGeneration) ui.buyRubyGeneration.addEventListener("click", buyRubyGeneration);
+  if (ui.buyEmeraldGeneration) ui.buyEmeraldGeneration.addEventListener("click", buyEmeraldGeneration);
+  if (ui.buyDiamondGeneration) ui.buyDiamondGeneration.addEventListener("click", buyDiamondGeneration);
+  if (ui.buyAmethystGeneration) ui.buyAmethystGeneration.addEventListener("click", buyAmethystGeneration);
   if (ui.sellAllResources) ui.sellAllResources.addEventListener("click", sellAllResources);
   document.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
@@ -306,7 +342,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     const sellOneButton = target.closest(".resource-sell-btn") as HTMLButtonElement | null;
     if (sellOneButton instanceof HTMLButtonElement) {
       const ore = sellOneButton.dataset.ore;
-      if (ore === "sand" || ore === "coal" || ore === "copper" || ore === "iron" || ore === "silver" || ore === "gold") {
+      if (isSellableOre(ore)) {
         sellOneResource(ore);
       }
       return;
@@ -315,7 +351,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     const sellAllByResourceButton = target.closest(".inventory-sell-all-btn") as HTMLButtonElement | null;
     if (sellAllByResourceButton instanceof HTMLButtonElement) {
       const ore = sellAllByResourceButton.dataset.ore;
-      if (ore === "sand" || ore === "coal" || ore === "copper" || ore === "iron" || ore === "silver" || ore === "gold") {
+      if (isSellableOre(ore)) {
         sellAllByResource(ore);
       }
       return;
@@ -328,6 +364,8 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.addEventListener("click", buyCritChanceUpgrade);
   if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.addEventListener("click", buyCritMultiplierUpgrade);
   if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.addEventListener("click", buyChainReactionUpgrade);
+  if (ui.popupUpgradeMetalBias) ui.popupUpgradeMetalBias.addEventListener("click", buyMetalBiasUpgrade);
+  if (ui.popupUpgradeElectricEfficiency) ui.popupUpgradeElectricEfficiency.addEventListener("click", buyElectricEfficiencyUpgrade);
   if (ui.popupUpgradeEnchantBountiful) ui.popupUpgradeEnchantBountiful.addEventListener("click", buyEnchantBountifulUpgrade);
   if (ui.popupUpgradeEnchantBountifulMin) ui.popupUpgradeEnchantBountifulMin.addEventListener("click", buyEnchantBountifulMinUpgrade);
   if (ui.popupUpgradeEnchantBountifulMax) ui.popupUpgradeEnchantBountifulMax.addEventListener("click", buyEnchantBountifulMaxUpgrade);

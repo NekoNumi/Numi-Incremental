@@ -36,6 +36,8 @@ interface CreateMinerLogicArgs {
   critChanceUpgrade: UpgradeConfig;
   critMultiplierUpgrade: UpgradeConfig;
   chainReactionUpgrade: UpgradeConfig;
+  metalBiasUpgrade: UpgradeConfig;
+  electricEfficiencyUpgrade: UpgradeConfig;
   enchantBountifulUpgrade: UpgradeConfig;
   enchantBountifulMinUpgrade: UpgradeConfig;
   enchantBountifulMaxUpgrade: UpgradeConfig;
@@ -56,13 +58,20 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getVeinFinderCost: (minerIndex: number) => number;
   getCritChanceCost: (minerIndex: number) => number;
   getCritMultiplierCost: (minerIndex: number) => number;
+  canUpgradeCritChance: (minerIndex: number) => boolean;
   getChainReactionCost: (minerIndex: number) => number;
+  getMetalBiasCost: (minerIndex: number) => number;
+  getElectricEfficiencyCost: (minerIndex: number) => number;
+  canUpgradeMetalBias: (minerIndex: number) => boolean;
+  canUpgradeElectricEfficiency: (minerIndex: number) => boolean;
   getEnchantBountifulCost: (minerIndex: number) => number;
+  canUpgradeEnchantBountifulChance: (minerIndex: number) => boolean;
   getEnchantBountifulMinCost: (minerIndex: number) => number;
   getEnchantBountifulMaxCost: (minerIndex: number) => number;
   getEnrichMinCost: (minerIndex: number) => number;
   getEnrichMaxCost: (minerIndex: number) => number;
   getEnrichChanceCost: (minerIndex: number) => number;
+  canUpgradeEnrichChance: (minerIndex: number) => boolean;
   getDoubleActivationMinPercent: (minerIndex: number) => number;
   getDoubleActivationMaxPercent: (minerIndex: number) => number;
   rollDoubleActivation: (minerIndex: number) => number;
@@ -77,6 +86,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getCritMultiplier: (minerIndex: number) => number;
   getChainReactionChance: (minerIndex: number) => number;
   getChainReactionLength: (minerIndex: number) => number;
+  getChainMetalBiasChance: (minerIndex: number) => number;
+  getElectricEfficiencyChance: (minerIndex: number) => number;
   getEnchantBountifulChance: (minerIndex: number) => number;
   getEnchantBountifulMinMultiplier: (minerIndex: number) => number;
   getEnchantBountifulMaxMultiplier: (minerIndex: number) => number;
@@ -86,6 +97,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getCritChanceStatText: (minerIndex: number) => string;
   getCritMultiplierStatText: (minerIndex: number) => string;
   getChainReactionStatText: (minerIndex: number) => string;
+  getMetalBiasStatText: (minerIndex: number) => string;
+  getElectricEfficiencyStatText: (minerIndex: number) => string;
   getEnchantBountifulStatText: (minerIndex: number) => string;
   getEnchantBountifulMinStatText: (minerIndex: number) => string;
   getEnchantBountifulMaxStatText: (minerIndex: number) => string;
@@ -126,6 +139,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     critChanceUpgrade,
     critMultiplierUpgrade,
     chainReactionUpgrade,
+    metalBiasUpgrade,
+    electricEfficiencyUpgrade,
     enchantBountifulUpgrade,
     enchantBountifulMinUpgrade,
     enchantBountifulMaxUpgrade,
@@ -219,16 +234,56 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     return getUpgradeCost(critMultiplierUpgrade, level);
   }
 
+  function canUpgradeCritChance(minerIndex: number): boolean {
+    if (!canUseClass(minerIndex, "Crit Build")) {
+      return false;
+    }
+    return getCritChance(minerIndex) < 0.75;
+  }
+
   function getChainReactionCost(minerIndex: number): number {
     const unit = getMinerUpgrade(minerIndex);
     const level = unit.specializationData.type === "Chain Lightning" ? unit.specializationData.chainReactionLevel : 0;
     return getUpgradeCost(chainReactionUpgrade, level);
   }
 
+  function getMetalBiasCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Chain Lightning" ? unit.specializationData.metalBiasLevel : 0;
+    return getUpgradeCost(metalBiasUpgrade, level);
+  }
+
+  function getElectricEfficiencyCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Chain Lightning" ? unit.specializationData.electricEfficiencyLevel : 0;
+    return getUpgradeCost(electricEfficiencyUpgrade, level);
+  }
+
+  function canUpgradeMetalBias(minerIndex: number): boolean {
+    if (!canUseClass(minerIndex, "Chain Lightning")) {
+      return false;
+    }
+    return getChainMetalBiasChance(minerIndex) < 0.75;
+  }
+
+  function canUpgradeElectricEfficiency(minerIndex: number): boolean {
+    if (!canUseClass(minerIndex, "Chain Lightning")) {
+      return false;
+    }
+    return getElectricEfficiencyChance(minerIndex) < 0.5;
+  }
+
   function getEnchantBountifulCost(minerIndex: number): number {
     const unit = getMinerUpgrade(minerIndex);
     const level = unit.specializationData.type === "Arcanist" ? unit.specializationData.enchantBountifulLevel : 0;
     return getUpgradeCost(enchantBountifulUpgrade, level);
+  }
+
+  function canUpgradeEnchantBountifulChance(minerIndex: number): boolean {
+    if (!canUseClass(minerIndex, "Arcanist")) {
+      return false;
+    }
+    return getEnchantBountifulChance(minerIndex) < 0.75;
   }
 
   function getEnchantBountifulMinCost(minerIndex: number): number {
@@ -259,6 +314,13 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     const unit = getMinerUpgrade(minerIndex);
     const level = unit.specializationData.type === "Enricher" ? unit.specializationData.enrichChanceLevel : 0;
     return getUpgradeCost(enrichChanceUpgrade, level);
+  }
+
+  function canUpgradeEnrichChance(minerIndex: number): boolean {
+    if (!canUseClass(minerIndex, "Enricher")) {
+      return false;
+    }
+    return getEnrichChance(minerIndex) < 0.75;
   }
 
   function canUseClass(minerIndex: number, spec: UnitSpecialization): boolean {
@@ -359,7 +421,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
-    return Math.min(0.6, 0.1 + level * 0.03);
+    return Math.min(0.75, 0.1 + level * 0.03);
   }
 
   function getCritMultiplier(minerIndex: number): number {
@@ -384,6 +446,24 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Chain Lightning" ? data.chainReactionLevel : 0;
     return 1 + level;
+  }
+
+  function getChainMetalBiasChance(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Chain Lightning")) {
+      return 0;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Chain Lightning" ? data.metalBiasLevel : 0;
+    return Math.min(0.75, level * 0.05);
+  }
+
+  function getElectricEfficiencyChance(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Chain Lightning")) {
+      return 0;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Chain Lightning" ? data.electricEfficiencyLevel : 0;
+    return Math.min(0.5, level * 0.05);
   }
 
   function getEnchantBountifulChance(minerIndex: number): number {
@@ -437,14 +517,17 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Enricher" ? data.enrichChanceLevel : 0;
-    return Math.min(0.95, 0.2 + level * 0.08);
+    return Math.min(0.75, 0.2 + level * 0.08);
   }
 
   function getCritChanceStatText(minerIndex: number): string {
     const current = (getCritChance(minerIndex) * 100).toFixed(0);
+    if (!canUpgradeCritChance(minerIndex)) {
+      return `Current chance: ${current}% (Max reached)`;
+    }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
-    const next = (Math.min(0.6, 0.1 + (level + 1) * 0.03) * 100).toFixed(0);
+    const next = (Math.min(0.75, 0.1 + (level + 1) * 0.03) * 100).toFixed(0);
     return `Current chance: ${current}% → Upgrading to: ${next}%`;
   }
 
@@ -459,6 +542,22 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     const currentLength = getChainReactionLength(minerIndex);
     const nextLength = currentLength + 1;
     return `Current: ${currentChance}% chance, ${currentLength} adjacent chain(s) → Upgrading to: ${nextLength}`;
+  }
+
+  function getMetalBiasStatText(minerIndex: number): string {
+    const current = (getChainMetalBiasChance(minerIndex) * 100).toFixed(0);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Chain Lightning" ? data.metalBiasLevel : 0;
+    const next = (Math.min(0.75, (level + 1) * 0.05) * 100).toFixed(0);
+    return `Current metal bias: ${current}% → Upgrading to: ${next}%`;
+  }
+
+  function getElectricEfficiencyStatText(minerIndex: number): string {
+    const current = (getElectricEfficiencyChance(minerIndex) * 100).toFixed(0);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Chain Lightning" ? data.electricEfficiencyLevel : 0;
+    const next = (Math.min(0.5, (level + 1) * 0.05) * 100).toFixed(0);
+    return `Current extension chance: ${current}% → Upgrading to: ${next}% on metal chain`;
   }
 
   function getEnchantBountifulStatText(minerIndex: number): string {
@@ -503,9 +602,12 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function getEnrichChanceStatText(minerIndex: number): string {
     const current = (getEnrichChance(minerIndex) * 100).toFixed(0);
+    if (!canUpgradeEnrichChance(minerIndex)) {
+      return `Current chance: ${current}% (Max reached)`;
+    }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Enricher" ? data.enrichChanceLevel : 0;
-    const next = (Math.min(0.95, 0.2 + (level + 1) * 0.08) * 100).toFixed(0);
+    const next = (Math.min(0.75, 0.2 + (level + 1) * 0.08) * 100).toFixed(0);
     return `Current chance: ${current}% → Upgrading to: ${next}%`;
   }
 
@@ -647,13 +749,20 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getVeinFinderCost,
     getCritChanceCost,
     getCritMultiplierCost,
+    canUpgradeCritChance,
     getChainReactionCost,
+    getMetalBiasCost,
+    getElectricEfficiencyCost,
+    canUpgradeMetalBias,
+    canUpgradeElectricEfficiency,
     getEnchantBountifulCost,
+    canUpgradeEnchantBountifulChance,
     getEnchantBountifulMinCost,
     getEnchantBountifulMaxCost,
     getEnrichMinCost,
     getEnrichMaxCost,
     getEnrichChanceCost,
+    canUpgradeEnrichChance,
     getDoubleActivationMinPercent,
     getDoubleActivationMaxPercent,
     rollDoubleActivation,
@@ -668,6 +777,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getCritMultiplier,
     getChainReactionChance,
     getChainReactionLength,
+    getChainMetalBiasChance,
+    getElectricEfficiencyChance,
     getEnchantBountifulChance,
     getEnchantBountifulMinMultiplier,
     getEnchantBountifulMaxMultiplier,
@@ -677,6 +788,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getCritChanceStatText,
     getCritMultiplierStatText,
     getChainReactionStatText,
+    getMetalBiasStatText,
+    getElectricEfficiencyStatText,
     getEnchantBountifulStatText,
     getEnchantBountifulMinStatText,
     getEnchantBountifulMaxStatText,

@@ -5,7 +5,13 @@ export function getDefaultSpecializationData(specialization: UnitSpecialization)
     case "Crit Build":
       return { type: specialization, critChanceLevel: 0, critMultiplierLevel: 0 };
     case "Chain Lightning":
-      return { type: specialization, chainReactionLevel: 0, chainReactionChanceLevel: 0 };
+      return {
+        type: specialization,
+        chainReactionLevel: 0,
+        chainReactionChanceLevel: 0,
+        metalBiasLevel: 0,
+        electricEfficiencyLevel: 0,
+      };
     case "Prospector":
       return { type: specialization, veinFinderLevel: 0 };
     case "Multi Activator":
@@ -51,6 +57,8 @@ export function buildSpecializationData(raw: Record<string, unknown>, specializa
         type: "Chain Lightning",
         chainReactionLevel: Number(raw.chainReactionLevel) || 0,
         chainReactionChanceLevel: Number(raw.chainReactionChanceLevel) || 0,
+        metalBiasLevel: Number(raw.metalBiasLevel) || 0,
+        electricEfficiencyLevel: Number(raw.electricEfficiencyLevel) || 0,
       };
     case "Prospector":
       return {

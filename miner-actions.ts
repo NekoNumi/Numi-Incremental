@@ -18,14 +18,21 @@ interface CreateMinerActionsArgs {
   getDoubleActivationMaxCost: (minerIndex: number) => number;
   getVeinFinderCost: (minerIndex: number) => number;
   getCritChanceCost: (minerIndex: number) => number;
+  canUpgradeCritChance: (minerIndex: number) => boolean;
   getCritMultiplierCost: (minerIndex: number) => number;
   getChainReactionCost: (minerIndex: number) => number;
+  getMetalBiasCost: (minerIndex: number) => number;
+  getElectricEfficiencyCost: (minerIndex: number) => number;
+  canUpgradeMetalBias: (minerIndex: number) => boolean;
+  canUpgradeElectricEfficiency: (minerIndex: number) => boolean;
   getEnchantBountifulCost: (minerIndex: number) => number;
+  canUpgradeEnchantBountifulChance: (minerIndex: number) => boolean;
   getEnchantBountifulMinCost: (minerIndex: number) => number;
   getEnchantBountifulMaxCost: (minerIndex: number) => number;
   getEnrichMinCost: (minerIndex: number) => number;
   getEnrichMaxCost: (minerIndex: number) => number;
   getEnrichChanceCost: (minerIndex: number) => number;
+  canUpgradeEnrichChance: (minerIndex: number) => boolean;
 }
 
 export function createMinerActions(args: CreateMinerActionsArgs): {
@@ -38,6 +45,8 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
   buyCritChanceUpgrade: () => void;
   buyCritMultiplierUpgrade: () => void;
   buyChainReactionUpgrade: () => void;
+  buyMetalBiasUpgrade: () => void;
+  buyElectricEfficiencyUpgrade: () => void;
   buyEnchantBountifulUpgrade: () => void;
   buyEnchantBountifulMinUpgrade: () => void;
   buyEnchantBountifulMaxUpgrade: () => void;
@@ -58,14 +67,21 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     getDoubleActivationMaxCost,
     getVeinFinderCost,
     getCritChanceCost,
+    canUpgradeCritChance,
     getCritMultiplierCost,
     getChainReactionCost,
+    getMetalBiasCost,
+    getElectricEfficiencyCost,
+    canUpgradeMetalBias,
+    canUpgradeElectricEfficiency,
     getEnchantBountifulCost,
+    canUpgradeEnchantBountifulChance,
     getEnchantBountifulMinCost,
     getEnchantBountifulMaxCost,
     getEnrichMinCost,
     getEnrichMaxCost,
     getEnrichChanceCost,
+    canUpgradeEnrichChance,
   } = args;
 
   function buyMinerSpeedUpgrade(): void {
@@ -170,6 +186,7 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     const minerIndex = interactionState.selectedMinerIndex;
     if (minerIndex === null) return;
     if (!canUseClass(minerIndex, "Crit Build")) return;
+    if (!canUpgradeCritChance(minerIndex)) return;
     const cost = getCritChanceCost(minerIndex);
     if (!canAfford(cost)) {
       return;
@@ -214,10 +231,45 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     render();
   }
 
+  function buyMetalBiasUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Chain Lightning")) return;
+    if (!canUpgradeMetalBias(minerIndex)) return;
+    const cost = getMetalBiasCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Chain Lightning") {
+      data.metalBiasLevel += 1;
+    }
+    render();
+  }
+
+  function buyElectricEfficiencyUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Chain Lightning")) return;
+    if (!canUpgradeElectricEfficiency(minerIndex)) return;
+    const cost = getElectricEfficiencyCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Chain Lightning") {
+      data.electricEfficiencyLevel += 1;
+    }
+    render();
+  }
+
   function buyEnchantBountifulUpgrade(): void {
     const minerIndex = interactionState.selectedMinerIndex;
     if (minerIndex === null) return;
     if (!canUseClass(minerIndex, "Arcanist")) return;
+    if (!canUpgradeEnchantBountifulChance(minerIndex)) return;
     const cost = getEnchantBountifulCost(minerIndex);
     if (!canAfford(cost)) {
       return;
@@ -298,6 +350,7 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     const minerIndex = interactionState.selectedMinerIndex;
     if (minerIndex === null) return;
     if (!canUseClass(minerIndex, "Enricher")) return;
+    if (!canUpgradeEnrichChance(minerIndex)) return;
     const cost = getEnrichChanceCost(minerIndex);
     if (!canAfford(cost)) {
       return;
@@ -320,6 +373,8 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     buyCritChanceUpgrade,
     buyCritMultiplierUpgrade,
     buyChainReactionUpgrade,
+    buyMetalBiasUpgrade,
+    buyElectricEfficiencyUpgrade,
     buyEnchantBountifulUpgrade,
     buyEnchantBountifulMinUpgrade,
     buyEnchantBountifulMaxUpgrade,

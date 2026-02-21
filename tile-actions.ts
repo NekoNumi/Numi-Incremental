@@ -19,6 +19,8 @@ interface CreateTileActionsArgs {
   rollTileTypeWithBoostedOre: (boostedOre: UpgradableOre, qualityMultiplier: number) => OreType;
   getChainReactionChance: (minerIndex: number) => number;
   getChainReactionLength: (minerIndex: number) => number;
+  getChainMetalBiasChance: (minerIndex: number) => number;
+  getElectricEfficiencyChance: (minerIndex: number) => number;
   render: () => void;
 }
 
@@ -48,11 +50,80 @@ export function createTileActions(args: CreateTileActionsArgs): {
     rollTileTypeWithBoostedOre,
     getChainReactionChance,
     getChainReactionLength,
+    getChainMetalBiasChance,
+    getElectricEfficiencyChance,
     render,
   } = args;
 
+  const METAL_ORES: OreType[] = ["copper", "iron", "silver", "gold"];
+
+  function triggerCritSpark(tile: HTMLElement): void {
+    tile.classList.remove("map-tile--crit-spark");
+    void tile.offsetWidth;
+    tile.classList.add("map-tile--crit-spark");
+    setTimeout(() => {
+      tile.classList.remove("map-tile--crit-spark");
+    }, 420);
+  }
+
+  function triggerElectricEfficiencySpark(tile: HTMLElement): void {
+    tile.classList.remove("map-tile--electric-spark");
+    void tile.offsetWidth;
+    tile.classList.add("map-tile--electric-spark");
+    setTimeout(() => {
+      tile.classList.remove("map-tile--electric-spark");
+    }, 520);
+  }
+
+  function renderChainArc(fromTile: HTMLElement, toTile: HTMLElement): void {
+    if (!mapGrid) {
+      return;
+    }
+
+    const gridRect = mapGrid.getBoundingClientRect();
+    const fromRect = fromTile.getBoundingClientRect();
+    const toRect = toTile.getBoundingClientRect();
+
+    const fromX = fromRect.left - gridRect.left + fromRect.width / 2;
+    const fromY = fromRect.top - gridRect.top + fromRect.height / 2;
+    const toX = toRect.left - gridRect.left + toRect.width / 2;
+    const toY = toRect.top - gridRect.top + toRect.height / 2;
+
+    const deltaX = toX - fromX;
+    const deltaY = toY - fromY;
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (distance <= 0) {
+      return;
+    }
+
+    const angleDeg = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+    const arc = document.createElement("div");
+    arc.className = "chain-lightning-arc";
+    arc.style.left = `${fromX}px`;
+    arc.style.top = `${fromY}px`;
+    arc.style.width = `${distance}px`;
+    arc.style.transform = `translateY(-50%) rotate(${angleDeg}deg)`;
+    mapGrid.appendChild(arc);
+
+    setTimeout(() => {
+      arc.remove();
+    }, 1000);
+  }
+
   function clearTileOreClasses(tile: HTMLElement): void {
-    tile.classList.remove("map-tile--coal", "map-tile--copper", "map-tile--iron", "map-tile--silver", "map-tile--gold");
+    tile.classList.remove(
+      "map-tile--coal",
+      "map-tile--copper",
+      "map-tile--iron",
+      "map-tile--silver",
+      "map-tile--gold",
+      "map-tile--sapphire",
+      "map-tile--ruby",
+      "map-tile--emerald",
+      "map-tile--diamond",
+      "map-tile--amethyst"
+    );
   }
 
   function ensureTileEnchantment(tile: HTMLElement): void {
@@ -133,6 +204,16 @@ export function createTileActions(args: CreateTileActionsArgs): {
         return "Silver tile";
       case "gold":
         return "Gold tile";
+      case "sapphire":
+        return "Sapphire tile";
+      case "ruby":
+        return "Ruby tile";
+      case "emerald":
+        return "Emerald tile";
+      case "diamond":
+        return "Diamond tile";
+      case "amethyst":
+        return "Amethyst tile";
       default:
         return "Sandy tile";
     }
@@ -231,6 +312,7 @@ export function createTileActions(args: CreateTileActionsArgs): {
 
     let quantity = enrichMultiplier;
     if (isCrit) {
+      triggerCritSpark(tile);
       const bonusFromMultiplier = Math.max(0, critMultiplier - 1);
       const guaranteedBonus = Math.floor(bonusFromMultiplier);
       const remainderBonus = bonusFromMultiplier - guaranteedBonus;
@@ -331,7 +413,20 @@ export function createTileActions(args: CreateTileActionsArgs): {
         break;
       }
 
-      const nextTile = adjacentTiles[Math.floor(Math.random() * adjacentTiles.length)];
+      const metalBiasChance = getChainMetalBiasChance(minerIndex);
+      let candidateTiles = adjacentTiles;
+      if (metalBiasChance > 0) {
+        const metalTiles = adjacentTiles.filter((tile) => {
+          const tileType = (tile.dataset.tileType as OreType) || "sand";
+          return METAL_ORES.includes(tileType);
+        });
+        if (metalTiles.length > 0 && Math.random() < metalBiasChance) {
+          candidateTiles = metalTiles;
+        }
+      }
+
+      const nextTile = candidateTiles[Math.floor(Math.random() * candidateTiles.length)];
+      const chainedTileType = (nextTile.dataset.tileType as OreType) || "sand";
       const nextIndex = Number(nextTile.dataset.tileIndex);
       if (Number.isInteger(nextIndex)) {
         usedIndices.add(nextIndex);
@@ -341,8 +436,14 @@ export function createTileActions(args: CreateTileActionsArgs): {
         break;
       }
 
+      renderChainArc(currentTile, nextTile);
+
       triggered += 1;
       currentTile = nextTile;
+      if (METAL_ORES.includes(chainedTileType) && Math.random() < getElectricEfficiencyChance(minerIndex)) {
+        triggerElectricEfficiencySpark(nextTile);
+        remainingSteps += 1;
+      }
       remainingSteps -= 1;
     }
 

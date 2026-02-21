@@ -131,6 +131,11 @@ export function loadGameState(
       state.inventory.iron = Math.max(0, Number(parsedInventory.iron) || 0);
       state.inventory.silver = Math.max(0, Number(parsedInventory.silver) || 0);
       state.inventory.gold = Math.max(0, Number(parsedInventory.gold) || 0);
+      state.inventory.sapphire = Math.max(0, Number(parsedInventory.sapphire) || 0);
+      state.inventory.ruby = Math.max(0, Number(parsedInventory.ruby) || 0);
+      state.inventory.emerald = Math.max(0, Number(parsedInventory.emerald) || 0);
+      state.inventory.diamond = Math.max(0, Number(parsedInventory.diamond) || 0);
+      state.inventory.amethyst = Math.max(0, Number(parsedInventory.amethyst) || 0);
     }
 
     syncIdleMinerState();

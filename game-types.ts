@@ -1,4 +1,5 @@
-export type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold";
+export type ResourceType = "stone" | "metal" | "gem";
+export type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold" | "sapphire" | "ruby" | "emerald" | "diamond" | "amethyst";
 export type UpgradableOre = Exclude<OreType, "sand">;
 export type TileEnchantment = "none" | "bountiful" | "enriched";
 
@@ -17,7 +18,13 @@ export interface Unit {
 export type UnitSpecializationData =
   | { type: "Worker" }
   | { type: "Crit Build"; critChanceLevel: number; critMultiplierLevel: number }
-  | { type: "Chain Lightning"; chainReactionLevel: number; chainReactionChanceLevel: number }
+  | {
+      type: "Chain Lightning";
+      chainReactionLevel: number;
+      chainReactionChanceLevel: number;
+      metalBiasLevel: number;
+      electricEfficiencyLevel: number;
+    }
   | { type: "Prospector"; veinFinderLevel: number }
   | { type: "Multi Activator"; multiActivationMinLevel: number; multiActivationMaxLevel: number }
   | { type: "Arcanist"; enchantBountifulLevel: number; enchantBountifulMinLevel: number; enchantBountifulMaxLevel: number }
@@ -38,6 +45,7 @@ export interface Bounds {
 export interface UpgradeConfig {
   baseCost: number;
   growth: number;
+  cappedMax?: boolean;
   bonusClicksPerSecond?: number;
   triggerIntervalSeconds?: number;
   radiusBonusPerLevel?: number;
@@ -45,6 +53,7 @@ export interface UpgradeConfig {
 
 export interface ResourceConfig {
   ore: OreType;
+  type: ResourceType;
   name: string;
   weight: number;
   value: number;

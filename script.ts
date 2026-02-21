@@ -10,6 +10,7 @@ import type {
   GameState,
   MinerTargeting,
   OreType,
+  UpgradableOre,
   UnitSpecialization,
   UpgradeConfig,
 } from "./game-types";
@@ -45,6 +46,12 @@ interface InteractionState {
   oreIronRevealed: boolean;
   oreSilverRevealed: boolean;
   oreGoldRevealed: boolean;
+  oreSapphireRevealed: boolean;
+  oreRubyRevealed: boolean;
+  oreEmeraldRevealed: boolean;
+  oreDiamondRevealed: boolean;
+  oreAmethystRevealed: boolean;
+  oreGemstoneRevealed: boolean;
 }
 
 interface UIElements {
@@ -106,6 +113,30 @@ interface UIElements {
   goldGenerationLevel: HTMLElement | null;
   goldGenerationStat: HTMLElement | null;
   buyGoldGeneration: HTMLButtonElement | null;
+  gemstoneGenerationCost: HTMLElement | null;
+  gemstoneGenerationLevel: HTMLElement | null;
+  gemstoneGenerationStat: HTMLElement | null;
+  buyGemstoneGeneration: HTMLButtonElement | null;
+  sapphireGenerationCost: HTMLElement | null;
+  sapphireGenerationLevel: HTMLElement | null;
+  sapphireGenerationStat: HTMLElement | null;
+  buySapphireGeneration: HTMLButtonElement | null;
+  rubyGenerationCost: HTMLElement | null;
+  rubyGenerationLevel: HTMLElement | null;
+  rubyGenerationStat: HTMLElement | null;
+  buyRubyGeneration: HTMLButtonElement | null;
+  emeraldGenerationCost: HTMLElement | null;
+  emeraldGenerationLevel: HTMLElement | null;
+  emeraldGenerationStat: HTMLElement | null;
+  buyEmeraldGeneration: HTMLButtonElement | null;
+  diamondGenerationCost: HTMLElement | null;
+  diamondGenerationLevel: HTMLElement | null;
+  diamondGenerationStat: HTMLElement | null;
+  buyDiamondGeneration: HTMLButtonElement | null;
+  amethystGenerationCost: HTMLElement | null;
+  amethystGenerationLevel: HTMLElement | null;
+  amethystGenerationStat: HTMLElement | null;
+  buyAmethystGeneration: HTMLButtonElement | null;
   closeMinerPopupButton: HTMLButtonElement | null;
   popupSpeedStat: HTMLElement | null;
   popupRadiusStat: HTMLElement | null;
@@ -133,6 +164,14 @@ interface UIElements {
   popupChainReactionCost: HTMLElement | null;
   popupChainReactionLevel: HTMLElement | null;
   popupChainReactionStat: HTMLElement | null;
+  popupUpgradeMetalBias: HTMLButtonElement | null;
+  popupMetalBiasCost: HTMLElement | null;
+  popupMetalBiasLevel: HTMLElement | null;
+  popupMetalBiasStat: HTMLElement | null;
+  popupUpgradeElectricEfficiency: HTMLButtonElement | null;
+  popupElectricEfficiencyCost: HTMLElement | null;
+  popupElectricEfficiencyLevel: HTMLElement | null;
+  popupElectricEfficiencyStat: HTMLElement | null;
   popupUpgradeEnchantBountiful: HTMLButtonElement | null;
   popupEnchantBountifulCost: HTMLElement | null;
   popupEnchantBountifulLevel: HTMLElement | null;
@@ -212,6 +251,12 @@ const interactionState: InteractionState = {
   oreIronRevealed: false,
   oreSilverRevealed: false,
   oreGoldRevealed: false,
+  oreSapphireRevealed: false,
+  oreRubyRevealed: false,
+  oreEmeraldRevealed: false,
+  oreDiamondRevealed: false,
+  oreAmethystRevealed: false,
+  oreGemstoneRevealed: false,
 };
 
 let inventoryUiDirty = true;
@@ -228,7 +273,8 @@ interface InventoryRowRefs {
   sellButton: HTMLButtonElement;
 }
 
-const INVENTORY_ORES: InventoryOre[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
+const INVENTORY_ORES: InventoryOre[] = ["sand", "coal", "copper", "iron", "silver", "gold", "amethyst", "sapphire", "emerald", "ruby", "diamond"];
+const GEMSTONE_ORES: UpgradableOre[] = ["amethyst", "sapphire", "emerald", "ruby", "diamond"];
 const inventoryDirtyOres = new Set<InventoryOre>(INVENTORY_ORES);
 const inventoryRowRefs: Partial<Record<InventoryOre, InventoryRowRefs>> = {};
 
@@ -282,6 +328,7 @@ const veinFinderUpgrade: UpgradeConfig = {
 const critChanceUpgrade: UpgradeConfig = {
   baseCost: 240,
   growth: 1.3,
+  cappedMax: true,
 };
 
 const critMultiplierUpgrade: UpgradeConfig = {
@@ -294,9 +341,22 @@ const chainReactionUpgrade: UpgradeConfig = {
   growth: 1.45,
 };
 
+const metalBiasUpgrade: UpgradeConfig = {
+  baseCost: 320,
+  growth: 1.4,
+  cappedMax: true,
+};
+
+const electricEfficiencyUpgrade: UpgradeConfig = {
+  baseCost: 360,
+  growth: 1.42,
+  cappedMax: true,
+};
+
 const enchantBountifulUpgrade: UpgradeConfig = {
   baseCost: 300,
   growth: 1.4,
+  cappedMax: true,
 };
 
 const enchantBountifulMinUpgrade: UpgradeConfig = {
@@ -322,6 +382,7 @@ const enrichMaxUpgrade: UpgradeConfig = {
 const enrichChanceUpgrade: UpgradeConfig = {
   baseCost: 320,
   growth: 1.36,
+  cappedMax: true,
 };
 
 // UI Element references
@@ -386,6 +447,30 @@ const ui: UIElements = {
   goldGenerationLevel: document.getElementById("gold-generation-level"),
   goldGenerationStat: document.getElementById("gold-generation-stat"),
   buyGoldGeneration: document.getElementById("buy-gold-generation") as HTMLButtonElement,
+  gemstoneGenerationCost: document.getElementById("gemstone-generation-cost"),
+  gemstoneGenerationLevel: document.getElementById("gemstone-generation-level"),
+  gemstoneGenerationStat: document.getElementById("gemstone-generation-stat"),
+  buyGemstoneGeneration: document.getElementById("buy-gemstone-generation") as HTMLButtonElement,
+  sapphireGenerationCost: document.getElementById("sapphire-generation-cost"),
+  sapphireGenerationLevel: document.getElementById("sapphire-generation-level"),
+  sapphireGenerationStat: document.getElementById("sapphire-generation-stat"),
+  buySapphireGeneration: document.getElementById("buy-sapphire-generation") as HTMLButtonElement,
+  rubyGenerationCost: document.getElementById("ruby-generation-cost"),
+  rubyGenerationLevel: document.getElementById("ruby-generation-level"),
+  rubyGenerationStat: document.getElementById("ruby-generation-stat"),
+  buyRubyGeneration: document.getElementById("buy-ruby-generation") as HTMLButtonElement,
+  emeraldGenerationCost: document.getElementById("emerald-generation-cost"),
+  emeraldGenerationLevel: document.getElementById("emerald-generation-level"),
+  emeraldGenerationStat: document.getElementById("emerald-generation-stat"),
+  buyEmeraldGeneration: document.getElementById("buy-emerald-generation") as HTMLButtonElement,
+  diamondGenerationCost: document.getElementById("diamond-generation-cost"),
+  diamondGenerationLevel: document.getElementById("diamond-generation-level"),
+  diamondGenerationStat: document.getElementById("diamond-generation-stat"),
+  buyDiamondGeneration: document.getElementById("buy-diamond-generation") as HTMLButtonElement,
+  amethystGenerationCost: document.getElementById("amethyst-generation-cost"),
+  amethystGenerationLevel: document.getElementById("amethyst-generation-level"),
+  amethystGenerationStat: document.getElementById("amethyst-generation-stat"),
+  buyAmethystGeneration: document.getElementById("buy-amethyst-generation") as HTMLButtonElement,
   closeMinerPopupButton: document.getElementById("close-miner-popup") as HTMLButtonElement,
   popupUpgradeDoubleActivationMin: document.getElementById("popup-upgrade-double-activation-min") as HTMLButtonElement,
   popupDoubleActivationMinCost: document.getElementById("popup-double-activation-min-cost"),
@@ -411,6 +496,14 @@ const ui: UIElements = {
   popupChainReactionCost: document.getElementById("popup-chain-reaction-cost"),
   popupChainReactionLevel: document.getElementById("popup-chain-reaction-level"),
   popupChainReactionStat: document.getElementById("popup-chain-reaction-stat"),
+  popupUpgradeMetalBias: document.getElementById("popup-upgrade-metal-bias") as HTMLButtonElement,
+  popupMetalBiasCost: document.getElementById("popup-metal-bias-cost"),
+  popupMetalBiasLevel: document.getElementById("popup-metal-bias-level"),
+  popupMetalBiasStat: document.getElementById("popup-metal-bias-stat"),
+  popupUpgradeElectricEfficiency: document.getElementById("popup-upgrade-electric-efficiency") as HTMLButtonElement,
+  popupElectricEfficiencyCost: document.getElementById("popup-electric-efficiency-cost"),
+  popupElectricEfficiencyLevel: document.getElementById("popup-electric-efficiency-level"),
+  popupElectricEfficiencyStat: document.getElementById("popup-electric-efficiency-stat"),
   popupUpgradeEnchantBountiful: document.getElementById("popup-upgrade-enchant-bountiful") as HTMLButtonElement,
   popupEnchantBountifulCost: document.getElementById("popup-enchant-bountiful-cost"),
   popupEnchantBountifulLevel: document.getElementById("popup-enchant-bountiful-level"),
@@ -470,6 +563,10 @@ function getUpgradeCost(config: UpgradeConfig, owned: number): number {
   return Math.floor(config.baseCost * config.growth ** owned);
 }
 
+function canOfferUpgrade(config: UpgradeConfig, canUpgrade: boolean): boolean {
+  return config.cappedMax ? canUpgrade : true;
+}
+
 function getMapSize(): number {
   return 1 + state.mapExpansions;
 }
@@ -484,9 +581,62 @@ function getIdleMinerCost(): number {
   return idleMiner.baseCost * nextCount ** 3;
 }
 
+function getGemstoneGenerationLevel(): number {
+  return Math.max(...GEMSTONE_ORES.map((ore) => getOreGenerationLevel(ore)));
+}
+
+function syncGemstoneGenerationLevels(): void {
+  const sharedLevel = getGemstoneGenerationLevel();
+  for (const ore of GEMSTONE_ORES) {
+    if (getOreGenerationLevel(ore) !== sharedLevel) {
+      setOreGenerationLevel(ore, sharedLevel);
+    }
+  }
+}
+
+function getGemstoneGenerationCost(): number {
+  return getOreGenerationCost(GEMSTONE_ORES[0]);
+}
+
+function canIncreaseGemstoneGeneration(): boolean {
+  return GEMSTONE_ORES.every((ore) => canIncreaseOreGeneration(ore));
+}
+
+function getGemstoneGenerationStatText(): string {
+  const currentLevel = getGemstoneGenerationLevel();
+  const currentWeight = GEMSTONE_ORES.reduce((sum, ore) => sum + getOreWeightForLevel(ore, currentLevel), 0);
+  const nextWeight = GEMSTONE_ORES.reduce((sum, ore) => sum + getOreWeightForLevel(ore, currentLevel + 1), 0);
+
+  if (currentLevel <= 0) {
+    return `Locked. Weight: 0 → ${round(nextWeight, 2).toLocaleString()} on first upgrade`;
+  }
+
+  return `Weight: ${round(currentWeight, 2).toLocaleString()} → ${round(nextWeight, 2).toLocaleString()} (+20%)`;
+}
+
+function buyGemstoneGenerationUpgrade(): void {
+  if (!canIncreaseGemstoneGeneration()) {
+    return;
+  }
+
+  const cost = getGemstoneGenerationCost();
+  if (!canAfford(cost)) {
+    return;
+  }
+
+  const nextLevel = getGemstoneGenerationLevel() + 1;
+  state.coins -= cost;
+  for (const ore of GEMSTONE_ORES) {
+    setOreGenerationLevel(ore, nextLevel);
+  }
+
+  render();
+}
+
 const {
   getOreGenerationLevel,
   setOreGenerationLevel,
+  getOreWeightForLevel,
   getOreGenerationCost,
   canIncreaseOreGeneration,
   rollTileType,
@@ -518,14 +668,21 @@ const {
   getDoubleActivationMaxCost,
   getVeinFinderCost,
   getCritChanceCost,
+  canUpgradeCritChance,
   getCritMultiplierCost,
   getChainReactionCost,
+  getMetalBiasCost,
+  getElectricEfficiencyCost,
+  canUpgradeMetalBias,
+  canUpgradeElectricEfficiency,
   getEnchantBountifulCost,
+  canUpgradeEnchantBountifulChance,
   getEnchantBountifulMinCost,
   getEnchantBountifulMaxCost,
   getEnrichMinCost,
   getEnrichMaxCost,
   getEnrichChanceCost,
+  canUpgradeEnrichChance,
   getDoubleActivationMinPercent,
   getDoubleActivationMaxPercent,
   rollDoubleActivation,
@@ -540,6 +697,8 @@ const {
   getCritMultiplier,
   getChainReactionChance,
   getChainReactionLength,
+  getChainMetalBiasChance,
+  getElectricEfficiencyChance,
   getEnchantBountifulChance,
   getEnchantBountifulMinMultiplier,
   getEnchantBountifulMaxMultiplier,
@@ -549,6 +708,8 @@ const {
   getCritChanceStatText,
   getCritMultiplierStatText,
   getChainReactionStatText,
+  getMetalBiasStatText,
+  getElectricEfficiencyStatText,
   getEnchantBountifulStatText,
   getEnchantBountifulMinStatText,
   getEnchantBountifulMaxStatText,
@@ -588,6 +749,8 @@ const {
   critChanceUpgrade,
   critMultiplierUpgrade,
   chainReactionUpgrade,
+  metalBiasUpgrade,
+  electricEfficiencyUpgrade,
   enchantBountifulUpgrade,
   enchantBountifulMinUpgrade,
   enchantBountifulMaxUpgrade,
@@ -752,7 +915,7 @@ function renderInventoryModal(): void {
   inventoryUiDirty = false;
 }
 
-function sellOneResource(ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold"): void {
+function sellOneResource(ore: OreType): void {
   const soldCoins = sellInventory(ore, 1);
   if (soldCoins <= 0) {
     setStatus(`No ${ore} available to sell.`);
@@ -764,7 +927,7 @@ function sellOneResource(ore: "sand" | "coal" | "copper" | "iron" | "silver" | "
   render();
 }
 
-function sellAllForResource(ore: "sand" | "coal" | "copper" | "iron" | "silver" | "gold"): void {
+function sellAllForResource(ore: OreType): void {
   const soldCoins = sellInventory(ore, getInventoryAmount(ore));
   if (soldCoins <= 0) {
     setStatus(`No ${ore} available to sell.`);
@@ -837,6 +1000,7 @@ function syncIdleMinerState(): void {
 
 function loadGame(): void {
   const outcome = loadGameState(SAVE_KEY, state, syncIdleMinerState, getCoinsPerSecond, round);
+  syncGemstoneGenerationLevels();
   if (outcome.invalid) {
     setStatus("Save data was invalid and has been ignored.");
     return;
@@ -903,6 +1067,8 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
   rollTileTypeWithBoostedOre,
   getChainReactionChance,
   getChainReactionLength,
+  getChainMetalBiasChance,
+  getElectricEfficiencyChance,
   getEnchantBountifulChance,
   getEnchantBountifulMinMultiplier,
   getEnchantBountifulMaxMultiplier,
@@ -922,6 +1088,8 @@ const {
   buyCritChanceUpgrade,
   buyCritMultiplierUpgrade,
   buyChainReactionUpgrade,
+  buyMetalBiasUpgrade,
+  buyElectricEfficiencyUpgrade,
   buyEnchantBountifulUpgrade,
   buyEnchantBountifulMinUpgrade,
   buyEnchantBountifulMaxUpgrade,
@@ -941,14 +1109,21 @@ const {
   getDoubleActivationMaxCost,
   getVeinFinderCost,
   getCritChanceCost,
+  canUpgradeCritChance,
   getCritMultiplierCost,
   getChainReactionCost,
+  getMetalBiasCost,
+  getElectricEfficiencyCost,
+  canUpgradeMetalBias,
+  canUpgradeElectricEfficiency,
   getEnchantBountifulCost,
+  canUpgradeEnchantBountifulChance,
   getEnchantBountifulMinCost,
   getEnchantBountifulMaxCost,
   getEnrichMinCost,
   getEnrichMaxCost,
   getEnrichChanceCost,
+  canUpgradeEnrichChance,
 });
 
 const {
@@ -960,6 +1135,11 @@ const {
   buyIronGeneration,
   buySilverGeneration,
   buyGoldGeneration,
+  buySapphireGeneration,
+  buyRubyGeneration,
+  buyEmeraldGeneration,
+  buyDiamondGeneration,
+  buyAmethystGeneration,
 } = createGameActions({
   state,
   saveKey: SAVE_KEY,
@@ -1061,6 +1241,8 @@ function renderMinerPopup(): void {
       critChanceLevel: 0,
       critMultiplierLevel: 0,
       chainReactionLevel: 0,
+      metalBiasLevel: 0,
+      electricEfficiencyLevel: 0,
       enchantBountifulLevel: 0,
       enchantBountifulMinLevel: 0,
       enchantBountifulMaxLevel: 0,
@@ -1075,6 +1257,8 @@ function renderMinerPopup(): void {
       critChanceCost: 0,
       critMultiplierCost: 0,
       chainReactionCost: 0,
+      metalBiasCost: 0,
+      electricEfficiencyCost: 0,
       enchantBountifulCost: 0,
       enchantBountifulMinCost: 0,
       enchantBountifulMaxCost: 0,
@@ -1089,6 +1273,8 @@ function renderMinerPopup(): void {
       critChanceStat: "",
       critMultiplierStat: "",
       chainReactionStat: "",
+      metalBiasStat: "",
+      electricEfficiencyStat: "",
       enchantBountifulStat: "",
       enchantBountifulMinStat: "",
       enchantBountifulMaxStat: "",
@@ -1103,9 +1289,14 @@ function renderMinerPopup(): void {
       showDoubleActivation: false,
       showVeinFinder: false,
       showCrit: false,
+      showCritChance: false,
       showChainLightning: false,
+      showMetalBias: false,
+      showElectricEfficiency: false,
       showArcanist: false,
+      showEnchantBountiful: false,
       showEnricher: false,
+      showEnrichChance: false,
       canBuySpeed: false,
       canBuyRadius: false,
       canBuyDoubleActivationMin: false,
@@ -1114,6 +1305,8 @@ function renderMinerPopup(): void {
       canBuyCritChance: false,
       canBuyCritMultiplier: false,
       canBuyChainReaction: false,
+      canBuyMetalBias: false,
+      canBuyElectricEfficiency: false,
       canBuyEnchantBountiful: false,
       canBuyEnchantBountifulMin: false,
       canBuyEnchantBountifulMax: false,
@@ -1134,6 +1327,8 @@ function renderMinerPopup(): void {
   const critChanceCost = getCritChanceCost(minerIndex);
   const critMultiplierCost = getCritMultiplierCost(minerIndex);
   const chainReactionCost = getChainReactionCost(minerIndex);
+  const metalBiasCost = getMetalBiasCost(minerIndex);
+  const electricEfficiencyCost = getElectricEfficiencyCost(minerIndex);
   const enchantBountifulCost = getEnchantBountifulCost(minerIndex);
   const enchantBountifulMinCost = getEnchantBountifulMinCost(minerIndex);
   const enchantBountifulMaxCost = getEnchantBountifulMaxCost(minerIndex);
@@ -1147,9 +1342,16 @@ function renderMinerPopup(): void {
   const showDoubleActivation = selectedSpec === "Multi Activator";
   const showVeinFinder = selectedSpec === "Prospector";
   const showCrit = selectedSpec === "Crit Build";
+  const showCritChance = showCrit && canOfferUpgrade(critChanceUpgrade, canUpgradeCritChance(minerIndex));
   const showChainLightning = selectedSpec === "Chain Lightning";
+  const showMetalBias = showChainLightning && canOfferUpgrade(metalBiasUpgrade, canUpgradeMetalBias(minerIndex));
+  const showElectricEfficiency =
+    showChainLightning && canOfferUpgrade(electricEfficiencyUpgrade, canUpgradeElectricEfficiency(minerIndex));
   const showArcanist = selectedSpec === "Arcanist";
+  const showEnchantBountiful =
+    showArcanist && canOfferUpgrade(enchantBountifulUpgrade, canUpgradeEnchantBountifulChance(minerIndex));
   const showEnricher = selectedSpec === "Enricher";
+  const showEnrichChance = showEnricher && canOfferUpgrade(enrichChanceUpgrade, canUpgradeEnrichChance(minerIndex));
   const multiData = upgrade.specializationData.type === "Multi Activator" ? upgrade.specializationData : null;
   const prospectorData = upgrade.specializationData.type === "Prospector" ? upgrade.specializationData : null;
   const critData = upgrade.specializationData.type === "Crit Build" ? upgrade.specializationData : null;
@@ -1176,6 +1378,8 @@ function renderMinerPopup(): void {
     critChanceLevel: critData?.critChanceLevel ?? 0,
     critMultiplierLevel: critData?.critMultiplierLevel ?? 0,
     chainReactionLevel: chainData?.chainReactionLevel ?? 0,
+    metalBiasLevel: chainData?.metalBiasLevel ?? 0,
+    electricEfficiencyLevel: chainData?.electricEfficiencyLevel ?? 0,
     enchantBountifulLevel: arcanistData?.enchantBountifulLevel ?? 0,
     enchantBountifulMinLevel: arcanistData?.enchantBountifulMinLevel ?? 0,
     enchantBountifulMaxLevel: arcanistData?.enchantBountifulMaxLevel ?? 0,
@@ -1190,6 +1394,8 @@ function renderMinerPopup(): void {
     critChanceCost,
     critMultiplierCost,
     chainReactionCost,
+    metalBiasCost,
+    electricEfficiencyCost,
     enchantBountifulCost,
     enchantBountifulMinCost,
     enchantBountifulMaxCost,
@@ -1204,6 +1410,8 @@ function renderMinerPopup(): void {
     critChanceStat: getCritChanceStatText(minerIndex),
     critMultiplierStat: getCritMultiplierStatText(minerIndex),
     chainReactionStat: getChainReactionStatText(minerIndex),
+    metalBiasStat: getMetalBiasStatText(minerIndex),
+    electricEfficiencyStat: getElectricEfficiencyStatText(minerIndex),
     enchantBountifulStat: getEnchantBountifulStatText(minerIndex),
     enchantBountifulMinStat: getEnchantBountifulMinStatText(minerIndex),
     enchantBountifulMaxStat: getEnchantBountifulMaxStatText(minerIndex),
@@ -1218,23 +1426,30 @@ function renderMinerPopup(): void {
     showDoubleActivation,
     showVeinFinder,
     showCrit,
+    showCritChance,
     showChainLightning,
+    showMetalBias,
+    showElectricEfficiency,
     showArcanist,
+    showEnchantBountiful,
     showEnricher,
+    showEnrichChance,
     canBuySpeed: canAfford(speedCost),
     canBuyRadius: canAfford(radiusCost),
     canBuyDoubleActivationMin: canAfford(doubleActivationMinCost) && canUseClass(minerIndex, "Multi Activator"),
     canBuyDoubleActivationMax: canAfford(doubleActivationMaxCost) && canUseClass(minerIndex, "Multi Activator"),
     canBuyVeinFinder: canAfford(veinFinderCost) && canUseClass(minerIndex, "Prospector"),
-    canBuyCritChance: canAfford(critChanceCost) && canUseClass(minerIndex, "Crit Build"),
+    canBuyCritChance: canAfford(critChanceCost) && canUpgradeCritChance(minerIndex),
     canBuyCritMultiplier: canAfford(critMultiplierCost) && canUseClass(minerIndex, "Crit Build"),
     canBuyChainReaction: canAfford(chainReactionCost) && canUseClass(minerIndex, "Chain Lightning"),
-    canBuyEnchantBountiful: canAfford(enchantBountifulCost) && canUseClass(minerIndex, "Arcanist"),
+    canBuyMetalBias: canAfford(metalBiasCost) && canUpgradeMetalBias(minerIndex),
+    canBuyElectricEfficiency: canAfford(electricEfficiencyCost) && canUpgradeElectricEfficiency(minerIndex),
+    canBuyEnchantBountiful: canAfford(enchantBountifulCost) && canUpgradeEnchantBountifulChance(minerIndex),
     canBuyEnchantBountifulMin: canAfford(enchantBountifulMinCost) && canUseClass(minerIndex, "Arcanist"),
     canBuyEnchantBountifulMax: canAfford(enchantBountifulMaxCost) && canUseClass(minerIndex, "Arcanist"),
     canBuyEnrichMin: canAfford(enrichMinCost) && canUseClass(minerIndex, "Enricher"),
     canBuyEnrichMax: canAfford(enrichMaxCost) && canUseClass(minerIndex, "Enricher"),
-    canBuyEnrichChance: canAfford(enrichChanceCost) && canUseClass(minerIndex, "Enricher"),
+    canBuyEnrichChance: canAfford(enrichChanceCost) && canUpgradeEnrichChance(minerIndex),
     placementMode: interactionState.placementMode,
   });
 }
@@ -1300,6 +1515,7 @@ function renderNow(): void {
   }
 
   syncIdleMinerState();
+  syncGemstoneGenerationLevels();
 
   const idleMinerCost = getIdleMinerCost();
   const mapCost = getMapExpansionCost();
@@ -1308,18 +1524,25 @@ function renderNow(): void {
   const ironCost = getOreGenerationCost("iron");
   const silverCost = getOreGenerationCost("silver");
   const goldCost = getOreGenerationCost("gold");
+  const gemstoneCost = getGemstoneGenerationCost();
   const canUpgradeCoalGeneration = canIncreaseOreGeneration("coal");
   const canUpgradeCopperGeneration = canIncreaseOreGeneration("copper");
   const canUpgradeIronGeneration = canIncreaseOreGeneration("iron");
   const canUpgradeSilverGeneration = canIncreaseOreGeneration("silver");
   const canUpgradeGoldGeneration = canIncreaseOreGeneration("gold");
+  const canUpgradeGemstoneGeneration = canIncreaseGemstoneGeneration();
   const totalInventory =
     getInventoryAmount("sand") +
     getInventoryAmount("coal") +
     getInventoryAmount("copper") +
     getInventoryAmount("iron") +
     getInventoryAmount("silver") +
-    getInventoryAmount("gold");
+    getInventoryAmount("gold") +
+    getInventoryAmount("sapphire") +
+    getInventoryAmount("ruby") +
+    getInventoryAmount("emerald") +
+    getInventoryAmount("diamond") +
+    getInventoryAmount("amethyst");
   const mapSize = getMapSize();
 
   if (!interactionState.oreCopperRevealed && shouldRevealNextOre(getOreGenerationLevel("coal"), state.coins, copperCost)) {
@@ -1333,6 +1556,9 @@ function renderNow(): void {
   }
   if (!interactionState.oreGoldRevealed && shouldRevealNextOre(getOreGenerationLevel("silver"), state.coins, goldCost)) {
     interactionState.oreGoldRevealed = true;
+  }
+  if (!interactionState.oreGemstoneRevealed && shouldRevealNextOre(getOreGenerationLevel("gold"), state.coins, gemstoneCost)) {
+    interactionState.oreGemstoneRevealed = true;
   }
 
   if (ui.coins && lastRenderedCoinValue !== state.coins) {
@@ -1392,6 +1618,13 @@ function renderNow(): void {
   if (ui.goldGenerationLevel) ui.goldGenerationLevel.textContent = getOreGenerationLevel("gold").toString();
   if (ui.goldGenerationStat) ui.goldGenerationStat.textContent = getOreGenerationStatText("gold");
   if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost) || !canUpgradeGoldGeneration;
+  if (ui.buyGemstoneGeneration) {
+    ui.buyGemstoneGeneration.classList.toggle("hidden", (!interactionState.oreGemstoneRevealed && getGemstoneGenerationLevel() === 0) || !canUpgradeGemstoneGeneration);
+    ui.buyGemstoneGeneration.disabled = !canAfford(gemstoneCost) || !canUpgradeGemstoneGeneration;
+  }
+  if (ui.gemstoneGenerationCost) ui.gemstoneGenerationCost.textContent = gemstoneCost.toLocaleString();
+  if (ui.gemstoneGenerationLevel) ui.gemstoneGenerationLevel.textContent = getGemstoneGenerationLevel().toString();
+  if (ui.gemstoneGenerationStat) ui.gemstoneGenerationStat.textContent = getGemstoneGenerationStatText();
   if (ui.sellAllResources) ui.sellAllResources.disabled = totalInventory <= 0;
   renderInventoryAutoSellToggle();
 
@@ -1456,6 +1689,12 @@ bindUiEvents({
   buyIronGeneration,
   buySilverGeneration,
   buyGoldGeneration,
+  buyGemstoneGeneration: buyGemstoneGenerationUpgrade,
+  buySapphireGeneration,
+  buyRubyGeneration,
+  buyEmeraldGeneration,
+  buyDiamondGeneration,
+  buyAmethystGeneration,
   sellOneResource,
   sellAllByResource: sellAllForResource,
   sellAllResources: sellAllResourcesAction,
@@ -1465,6 +1704,8 @@ bindUiEvents({
   buyCritChanceUpgrade,
   buyCritMultiplierUpgrade,
   buyChainReactionUpgrade,
+  buyMetalBiasUpgrade,
+  buyElectricEfficiencyUpgrade,
   buyEnchantBountifulUpgrade,
   buyEnchantBountifulMinUpgrade,
   buyEnchantBountifulMaxUpgrade,
