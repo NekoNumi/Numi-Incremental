@@ -33,12 +33,14 @@ interface UiRefs {
   popupUpgradeCritChance: HTMLButtonElement | null;
   popupUpgradeCritMultiplier: HTMLButtonElement | null;
   popupUpgradeChainReaction: HTMLButtonElement | null;
+  popupUpgradeEnchantBountiful: HTMLButtonElement | null;
   popupUnlockClass: HTMLButtonElement | null;
   popupChooseClass: HTMLButtonElement | null;
   classPickVeinFinder: HTMLButtonElement | null;
   classPickCrit: HTMLButtonElement | null;
   classPickChainLightning: HTMLButtonElement | null;
   classPickDoubleActivation: HTMLButtonElement | null;
+  classPickArcanist: HTMLButtonElement | null;
   classModalClose: HTMLButtonElement | null;
   classModal: HTMLElement | null;
   popupTargetingRandom: HTMLButtonElement | null;
@@ -84,6 +86,7 @@ interface BindUiEventsArgs {
   buyCritChanceUpgrade: () => void;
   buyCritMultiplierUpgrade: () => void;
   buyChainReactionUpgrade: () => void;
+  buyEnchantBountifulUpgrade: () => void;
   unlockClassChoice: () => void;
   selectMinerSpecialization: (spec: Exclude<UnitSpecialization, "Worker">) => void;
   setMinerTargeting: (mode: "random" | "high-quality" | "low-quality") => void;
@@ -128,6 +131,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     buyCritChanceUpgrade,
     buyCritMultiplierUpgrade,
     buyChainReactionUpgrade,
+    buyEnchantBountifulUpgrade,
     unlockClassChoice,
     selectMinerSpecialization,
     setMinerTargeting,
@@ -301,12 +305,14 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.addEventListener("click", buyCritChanceUpgrade);
   if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.addEventListener("click", buyCritMultiplierUpgrade);
   if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.addEventListener("click", buyChainReactionUpgrade);
+  if (ui.popupUpgradeEnchantBountiful) ui.popupUpgradeEnchantBountiful.addEventListener("click", buyEnchantBountifulUpgrade);
   if (ui.popupUnlockClass) ui.popupUnlockClass.addEventListener("click", unlockClassChoice);
   if (ui.popupChooseClass) ui.popupChooseClass.addEventListener("click", () => setClassModalOpen(true));
   if (ui.classPickVeinFinder) ui.classPickVeinFinder.addEventListener("click", () => selectMinerSpecialization("Prospector"));
   if (ui.classPickCrit) ui.classPickCrit.addEventListener("click", () => selectMinerSpecialization("Crit Build"));
   if (ui.classPickChainLightning) ui.classPickChainLightning.addEventListener("click", () => selectMinerSpecialization("Chain Lightning"));
   if (ui.classPickDoubleActivation) ui.classPickDoubleActivation.addEventListener("click", () => selectMinerSpecialization("Multi Activator"));
+  if (ui.classPickArcanist) ui.classPickArcanist.addEventListener("click", () => selectMinerSpecialization("Arcanist"));
   if (ui.classModalClose) ui.classModalClose.addEventListener("click", () => setClassModalOpen(false));
   if (ui.classModal) {
     ui.classModal.addEventListener("click", (event) => {

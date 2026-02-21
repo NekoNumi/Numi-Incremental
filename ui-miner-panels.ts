@@ -11,6 +11,7 @@ interface MinerPopupUi {
   popupCritChanceLevel: HTMLElement | null;
   popupCritMultiplierLevel: HTMLElement | null;
   popupChainReactionLevel: HTMLElement | null;
+  popupEnchantBountifulLevel: HTMLElement | null;
   popupSpeedCost: HTMLElement | null;
   popupRadiusCost: HTMLElement | null;
   popupDoubleActivationMinCost: HTMLElement | null;
@@ -19,6 +20,7 @@ interface MinerPopupUi {
   popupCritChanceCost: HTMLElement | null;
   popupCritMultiplierCost: HTMLElement | null;
   popupChainReactionCost: HTMLElement | null;
+  popupEnchantBountifulCost: HTMLElement | null;
   popupSpeedStat: HTMLElement | null;
   popupRadiusStat: HTMLElement | null;
   popupDoubleActivationMinStat: HTMLElement | null;
@@ -27,6 +29,7 @@ interface MinerPopupUi {
   popupCritChanceStat: HTMLElement | null;
   popupCritMultiplierStat: HTMLElement | null;
   popupChainReactionStat: HTMLElement | null;
+  popupEnchantBountifulStat: HTMLElement | null;
   popupSpecStatus: HTMLElement | null;
   popupUnlockClass: HTMLButtonElement | null;
   popupChooseClass: HTMLButtonElement | null;
@@ -39,6 +42,7 @@ interface MinerPopupUi {
   popupUpgradeCritChance: HTMLButtonElement | null;
   popupUpgradeCritMultiplier: HTMLButtonElement | null;
   popupUpgradeChainReaction: HTMLButtonElement | null;
+  popupUpgradeEnchantBountiful: HTMLButtonElement | null;
   popupUpgradeSpeed: HTMLButtonElement | null;
   popupUpgradeRadius: HTMLButtonElement | null;
   popupReposition: HTMLButtonElement | null;
@@ -55,6 +59,7 @@ interface MinerPopupViewModel {
   critChanceLevel: number;
   critMultiplierLevel: number;
   chainReactionLevel: number;
+  enchantBountifulLevel: number;
   speedCost: number;
   radiusCost: number;
   doubleActivationMinCost: number;
@@ -63,6 +68,7 @@ interface MinerPopupViewModel {
   critChanceCost: number;
   critMultiplierCost: number;
   chainReactionCost: number;
+  enchantBountifulCost: number;
   speedStat: string;
   radiusStat: string;
   doubleActivationMinStat: string;
@@ -71,6 +77,7 @@ interface MinerPopupViewModel {
   critChanceStat: string;
   critMultiplierStat: string;
   chainReactionStat: string;
+  enchantBountifulStat: string;
   specStatus: string;
   canUnlockClass: boolean;
   specAffordable: boolean;
@@ -80,6 +87,7 @@ interface MinerPopupViewModel {
   showVeinFinder: boolean;
   showCrit: boolean;
   showChainLightning: boolean;
+  showArcanist: boolean;
   canBuySpeed: boolean;
   canBuyRadius: boolean;
   canBuyDoubleActivationMin: boolean;
@@ -88,6 +96,7 @@ interface MinerPopupViewModel {
   canBuyCritChance: boolean;
   canBuyCritMultiplier: boolean;
   canBuyChainReaction: boolean;
+  canBuyEnchantBountiful: boolean;
   placementMode: boolean;
 }
 
@@ -135,6 +144,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupCritChanceLevel) ui.popupCritChanceLevel.textContent = view.critChanceLevel.toString();
   if (ui.popupCritMultiplierLevel) ui.popupCritMultiplierLevel.textContent = view.critMultiplierLevel.toString();
   if (ui.popupChainReactionLevel) ui.popupChainReactionLevel.textContent = view.chainReactionLevel.toString();
+  if (ui.popupEnchantBountifulLevel) ui.popupEnchantBountifulLevel.textContent = view.enchantBountifulLevel.toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = view.speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = view.radiusCost.toLocaleString();
   if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = view.doubleActivationMinCost.toLocaleString();
@@ -143,6 +153,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupCritChanceCost) ui.popupCritChanceCost.textContent = view.critChanceCost.toLocaleString();
   if (ui.popupCritMultiplierCost) ui.popupCritMultiplierCost.textContent = view.critMultiplierCost.toLocaleString();
   if (ui.popupChainReactionCost) ui.popupChainReactionCost.textContent = view.chainReactionCost.toLocaleString();
+  if (ui.popupEnchantBountifulCost) ui.popupEnchantBountifulCost.textContent = view.enchantBountifulCost.toLocaleString();
   if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = view.speedStat;
   if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = view.radiusStat;
   if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = view.doubleActivationMinStat;
@@ -151,6 +162,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupCritChanceStat) ui.popupCritChanceStat.textContent = view.critChanceStat;
   if (ui.popupCritMultiplierStat) ui.popupCritMultiplierStat.textContent = view.critMultiplierStat;
   if (ui.popupChainReactionStat) ui.popupChainReactionStat.textContent = view.chainReactionStat;
+  if (ui.popupEnchantBountifulStat) ui.popupEnchantBountifulStat.textContent = view.enchantBountifulStat;
   if (ui.popupSpecStatus) ui.popupSpecStatus.textContent = view.specStatus;
 
   if (ui.popupUnlockClass) {
@@ -178,6 +190,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.classList.toggle("hidden", !view.showCrit);
   if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.classList.toggle("hidden", !view.showCrit);
   if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.classList.toggle("hidden", !view.showChainLightning);
+  if (ui.popupUpgradeEnchantBountiful) ui.popupUpgradeEnchantBountiful.classList.toggle("hidden", !view.showArcanist);
 
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !view.canBuySpeed;
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !view.canBuyRadius;
@@ -187,6 +200,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUpgradeCritChance) ui.popupUpgradeCritChance.disabled = !view.canBuyCritChance;
   if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.disabled = !view.canBuyCritMultiplier;
   if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.disabled = !view.canBuyChainReaction;
+  if (ui.popupUpgradeEnchantBountiful) ui.popupUpgradeEnchantBountiful.disabled = !view.canBuyEnchantBountiful;
   if (ui.popupReposition) ui.popupReposition.textContent = view.placementMode ? "Click map to place…" : "Reposition";
 }
 

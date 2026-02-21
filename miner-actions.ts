@@ -9,7 +9,7 @@ interface CreateMinerActionsArgs {
   state: GameState;
   interactionState: MinerActionsInteractionState;
   canAfford: (cost: number) => boolean;
-  canUseClass: (minerIndex: number, spec: "Multi Activator" | "Prospector" | "Crit Build" | "Chain Lightning") => boolean;
+  canUseClass: (minerIndex: number, spec: "Multi Activator" | "Prospector" | "Crit Build" | "Chain Lightning" | "Arcanist") => boolean;
   render: () => void;
   getMinerSpeedUpgradeCost: (minerIndex: number) => number;
   getMinerRadiusUpgradeCost: (minerIndex: number) => number;
@@ -20,6 +20,7 @@ interface CreateMinerActionsArgs {
   getCritChanceCost: (minerIndex: number) => number;
   getCritMultiplierCost: (minerIndex: number) => number;
   getChainReactionCost: (minerIndex: number) => number;
+  getEnchantBountifulCost: (minerIndex: number) => number;
 }
 
 export function createMinerActions(args: CreateMinerActionsArgs): {
@@ -32,6 +33,7 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
   buyCritChanceUpgrade: () => void;
   buyCritMultiplierUpgrade: () => void;
   buyChainReactionUpgrade: () => void;
+  buyEnchantBountifulUpgrade: () => void;
 } {
   const {
     state,
@@ -48,6 +50,7 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     getCritChanceCost,
     getCritMultiplierCost,
     getChainReactionCost,
+    getEnchantBountifulCost,
   } = args;
 
   function buyMinerSpeedUpgrade(): void {
@@ -196,6 +199,22 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     render();
   }
 
+  function buyEnchantBountifulUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Arcanist")) return;
+    const cost = getEnchantBountifulCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Arcanist") {
+      data.enchantBountifulLevel += 1;
+    }
+    render();
+  }
+
   return {
     buyMinerSpeedUpgrade,
     buyMinerRadiusUpgrade,
@@ -206,5 +225,6 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     buyCritChanceUpgrade,
     buyCritMultiplierUpgrade,
     buyChainReactionUpgrade,
+    buyEnchantBountifulUpgrade,
   };
 }

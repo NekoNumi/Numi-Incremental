@@ -10,6 +10,8 @@ export function getDefaultSpecializationData(specialization: UnitSpecialization)
       return { type: specialization, veinFinderLevel: 0 };
     case "Multi Activator":
       return { type: specialization, multiActivationMinLevel: 0, multiActivationMaxLevel: 0 };
+    case "Arcanist":
+      return { type: specialization, enchantBountifulLevel: 0 };
     default:
       return { type: "Worker" };
   }
@@ -25,6 +27,8 @@ export function normalizeSpecialization(value: unknown): UnitSpecialization {
       return "Chain Lightning";
     case "Multi Activator":
       return "Multi Activator";
+    case "Arcanist":
+      return "Arcanist";
     default:
       return "Worker";
   }
@@ -55,6 +59,11 @@ export function buildSpecializationData(raw: Record<string, unknown>, specializa
         multiActivationMinLevel: Number(raw.multiActivationMinLevel) || 0,
         multiActivationMaxLevel: Number(raw.multiActivationMaxLevel) || 0,
       };
+    case "Arcanist":
+      return {
+        type: "Arcanist",
+        enchantBountifulLevel: Number(raw.enchantBountifulLevel) || 0,
+      };
     default:
       return { type: "Worker" };
   }
@@ -70,6 +79,8 @@ export function getSpecializationLabel(value: UnitSpecialization): string {
       return "Chain Lightning";
     case "Multi Activator":
       return "⏩ Multi Activator";
+    case "Arcanist":
+      return "✨ Arcanist";
     default:
       return "Worker";
   }

@@ -49,7 +49,6 @@ interface InteractionState {
 
 interface UIElements {
   coins: HTMLElement | null;
-  perSecond: HTMLElement | null;
   idleMinerCost: HTMLElement | null;
   idleMinerOwned: HTMLElement | null;
   settingsToggle: HTMLElement | null;
@@ -132,6 +131,10 @@ interface UIElements {
   popupChainReactionCost: HTMLElement | null;
   popupChainReactionLevel: HTMLElement | null;
   popupChainReactionStat: HTMLElement | null;
+  popupUpgradeEnchantBountiful: HTMLButtonElement | null;
+  popupEnchantBountifulCost: HTMLElement | null;
+  popupEnchantBountifulLevel: HTMLElement | null;
+  popupEnchantBountifulStat: HTMLElement | null;
   popupSpecStatus: HTMLElement | null;
   popupUnlockClass: HTMLButtonElement | null;
   popupChooseClass: HTMLButtonElement | null;
@@ -143,6 +146,7 @@ interface UIElements {
   classPickCrit: HTMLButtonElement | null;
   classPickChainLightning: HTMLButtonElement | null;
   classPickDoubleActivation: HTMLButtonElement | null;
+  classPickArcanist: HTMLButtonElement | null;
   classModalClose: HTMLButtonElement | null;
   minerStatsPanel: HTMLElement | null;
   minerStatsTitle: HTMLElement | null;
@@ -186,6 +190,7 @@ const interactionState: InteractionState = {
 };
 
 let inventoryUiDirty = true;
+let lastRenderedCoinValue: number | null = null;
 
 type InventoryOre = OreType;
 
@@ -263,10 +268,14 @@ const chainReactionUpgrade: UpgradeConfig = {
   growth: 1.45,
 };
 
+const enchantBountifulUpgrade: UpgradeConfig = {
+  baseCost: 300,
+  growth: 1.4,
+};
+
 // UI Element references
 const ui: UIElements = {
   coins: document.getElementById("coins"),
-  perSecond: document.getElementById("per-second"),
   idleMinerCost: document.getElementById("idle-miner-cost"),
   idleMinerOwned: document.getElementById("idle-miner-owned"),
   settingsToggle: document.getElementById("settings-toggle"),
@@ -349,6 +358,10 @@ const ui: UIElements = {
   popupChainReactionCost: document.getElementById("popup-chain-reaction-cost"),
   popupChainReactionLevel: document.getElementById("popup-chain-reaction-level"),
   popupChainReactionStat: document.getElementById("popup-chain-reaction-stat"),
+  popupUpgradeEnchantBountiful: document.getElementById("popup-upgrade-enchant-bountiful") as HTMLButtonElement,
+  popupEnchantBountifulCost: document.getElementById("popup-enchant-bountiful-cost"),
+  popupEnchantBountifulLevel: document.getElementById("popup-enchant-bountiful-level"),
+  popupEnchantBountifulStat: document.getElementById("popup-enchant-bountiful-stat"),
   popupSpecStatus: document.getElementById("popup-spec-status"),
   popupUnlockClass: document.getElementById("popup-unlock-class") as HTMLButtonElement,
   popupChooseClass: document.getElementById("popup-choose-class") as HTMLButtonElement,
@@ -360,6 +373,7 @@ const ui: UIElements = {
   classPickCrit: document.getElementById("class-pick-crit") as HTMLButtonElement,
   classPickChainLightning: document.getElementById("class-pick-chain-lightning") as HTMLButtonElement,
   classPickDoubleActivation: document.getElementById("class-pick-double-activation") as HTMLButtonElement,
+  classPickArcanist: document.getElementById("class-pick-arcanist") as HTMLButtonElement,
   classModalClose: document.getElementById("close-class-modal") as HTMLButtonElement,
   minerStatsPanel: document.getElementById("miner-stats-panel"),
   minerStatsTitle: document.getElementById("miner-stats-title"),
@@ -431,6 +445,7 @@ const {
   getCritChanceCost,
   getCritMultiplierCost,
   getChainReactionCost,
+  getEnchantBountifulCost,
   getDoubleActivationMinPercent,
   getDoubleActivationMaxPercent,
   rollDoubleActivation,
@@ -445,14 +460,17 @@ const {
   getCritMultiplier,
   getChainReactionChance,
   getChainReactionLength,
+  getEnchantBountifulChance,
   getCritChanceStatText,
   getCritMultiplierStatText,
   getChainReactionStatText,
+  getEnchantBountifulStatText,
   getMinerDisplayName,
   getMinerRingLabel,
   canOfferClassUnlock,
   canChooseSpecialization,
   canUseClass,
+  isArcanistMiner,
   chooseTargetTile,
   getCoinsPerSecond,
   getMinerPosition,
@@ -479,6 +497,7 @@ const {
   critChanceUpgrade,
   critMultiplierUpgrade,
   chainReactionUpgrade,
+  enchantBountifulUpgrade,
 });
 
 const requestRender = createRenderScheduler(() => renderNow());
@@ -504,6 +523,7 @@ function unlockClassChoice(): void {
   }
   state.coins -= SPECIALIZATION_COST;
   state.units[minerIndex].specializationUnlocked = true;
+  setClassModalOpen(true);
   render();
 }
 
@@ -743,6 +763,8 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
     addInventory(ore, amount);
     markInventoryDirty(ore);
   },
+  getTileCoinValue,
+  isArcanistMiner,
   getCritChance,
   getCritMultiplier,
   getVeinFinderQualityMultiplier,
@@ -750,6 +772,7 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
   rollTileTypeWithBoostedOre,
   getChainReactionChance,
   getChainReactionLength,
+  getEnchantBountifulChance,
   render,
 });
 
@@ -763,6 +786,7 @@ const {
   buyCritChanceUpgrade,
   buyCritMultiplierUpgrade,
   buyChainReactionUpgrade,
+  buyEnchantBountifulUpgrade,
 } = createMinerActions({
   state,
   interactionState,
@@ -778,6 +802,7 @@ const {
   getCritChanceCost,
   getCritMultiplierCost,
   getChainReactionCost,
+  getEnchantBountifulCost,
 });
 
 const {
@@ -823,6 +848,7 @@ function renderMap(): void {
     const tile = document.createElement("div");
     tile.className = "map-tile";
     tile.dataset.tileIndex = index.toString();
+    tile.dataset.tileEnchantment = "none";
 
     applyTileType(tile, rollTileType());
     ui.mapGrid.appendChild(tile);
@@ -889,6 +915,7 @@ function renderMinerPopup(): void {
       critChanceLevel: 0,
       critMultiplierLevel: 0,
       chainReactionLevel: 0,
+      enchantBountifulLevel: 0,
       speedCost: 0,
       radiusCost: 0,
       doubleActivationMinCost: 0,
@@ -897,6 +924,7 @@ function renderMinerPopup(): void {
       critChanceCost: 0,
       critMultiplierCost: 0,
       chainReactionCost: 0,
+      enchantBountifulCost: 0,
       speedStat: "",
       radiusStat: "",
       doubleActivationMinStat: "",
@@ -905,6 +933,7 @@ function renderMinerPopup(): void {
       critChanceStat: "",
       critMultiplierStat: "",
       chainReactionStat: "",
+      enchantBountifulStat: "",
       specStatus: "",
       canUnlockClass: false,
       specAffordable: false,
@@ -914,6 +943,7 @@ function renderMinerPopup(): void {
       showVeinFinder: false,
       showCrit: false,
       showChainLightning: false,
+      showArcanist: false,
       canBuySpeed: false,
       canBuyRadius: false,
       canBuyDoubleActivationMin: false,
@@ -922,6 +952,7 @@ function renderMinerPopup(): void {
       canBuyCritChance: false,
       canBuyCritMultiplier: false,
       canBuyChainReaction: false,
+      canBuyEnchantBountiful: false,
       placementMode: interactionState.placementMode,
     });
     return;
@@ -936,6 +967,7 @@ function renderMinerPopup(): void {
   const critChanceCost = getCritChanceCost(minerIndex);
   const critMultiplierCost = getCritMultiplierCost(minerIndex);
   const chainReactionCost = getChainReactionCost(minerIndex);
+  const enchantBountifulCost = getEnchantBountifulCost(minerIndex);
   const canUnlockClass = canOfferClassUnlock(minerIndex);
   const canSpec = canChooseSpecialization(minerIndex);
   const selectedSpec = upgrade.specialization;
@@ -944,10 +976,12 @@ function renderMinerPopup(): void {
   const showVeinFinder = selectedSpec === "Prospector";
   const showCrit = selectedSpec === "Crit Build";
   const showChainLightning = selectedSpec === "Chain Lightning";
+  const showArcanist = selectedSpec === "Arcanist";
   const multiData = upgrade.specializationData.type === "Multi Activator" ? upgrade.specializationData : null;
   const prospectorData = upgrade.specializationData.type === "Prospector" ? upgrade.specializationData : null;
   const critData = upgrade.specializationData.type === "Crit Build" ? upgrade.specializationData : null;
   const chainData = upgrade.specializationData.type === "Chain Lightning" ? upgrade.specializationData : null;
+  const arcanistData = upgrade.specializationData.type === "Arcanist" ? upgrade.specializationData : null;
 
   const specStatus = selectedSpec !== "Worker"
     ? `Specialization: ${getSpecializationLabel(selectedSpec)}`
@@ -968,6 +1002,7 @@ function renderMinerPopup(): void {
     critChanceLevel: critData?.critChanceLevel ?? 0,
     critMultiplierLevel: critData?.critMultiplierLevel ?? 0,
     chainReactionLevel: chainData?.chainReactionLevel ?? 0,
+    enchantBountifulLevel: arcanistData?.enchantBountifulLevel ?? 0,
     speedCost,
     radiusCost,
     doubleActivationMinCost,
@@ -976,6 +1011,7 @@ function renderMinerPopup(): void {
     critChanceCost,
     critMultiplierCost,
     chainReactionCost,
+    enchantBountifulCost,
     speedStat: getMinerSpeedStatText(minerIndex),
     radiusStat: getMinerRadiusStatText(minerIndex),
     doubleActivationMinStat: getDoubleActivationMinStatText(minerIndex),
@@ -984,6 +1020,7 @@ function renderMinerPopup(): void {
     critChanceStat: getCritChanceStatText(minerIndex),
     critMultiplierStat: getCritMultiplierStatText(minerIndex),
     chainReactionStat: getChainReactionStatText(minerIndex),
+    enchantBountifulStat: getEnchantBountifulStatText(minerIndex),
     specStatus,
     canUnlockClass,
     specAffordable,
@@ -993,6 +1030,7 @@ function renderMinerPopup(): void {
     showVeinFinder,
     showCrit,
     showChainLightning,
+    showArcanist,
     canBuySpeed: canAfford(speedCost),
     canBuyRadius: canAfford(radiusCost),
     canBuyDoubleActivationMin: canAfford(doubleActivationMinCost) && canUseClass(minerIndex, "Multi Activator"),
@@ -1001,6 +1039,7 @@ function renderMinerPopup(): void {
     canBuyCritChance: canAfford(critChanceCost) && canUseClass(minerIndex, "Crit Build"),
     canBuyCritMultiplier: canAfford(critMultiplierCost) && canUseClass(minerIndex, "Crit Build"),
     canBuyChainReaction: canAfford(chainReactionCost) && canUseClass(minerIndex, "Chain Lightning"),
+    canBuyEnchantBountiful: canAfford(enchantBountifulCost) && canUseClass(minerIndex, "Arcanist"),
     placementMode: interactionState.placementMode,
   });
 }
@@ -1067,7 +1106,6 @@ function renderNow(): void {
 
   syncIdleMinerState();
 
-  const cps = getCoinsPerSecond();
   const idleMinerCost = getIdleMinerCost();
   const mapCost = getMapExpansionCost();
   const coalCost = getOreGenerationCost("coal");
@@ -1097,8 +1135,10 @@ function renderNow(): void {
     interactionState.oreGoldRevealed = true;
   }
 
-  if (ui.coins) ui.coins.textContent = format(state.coins);
-  if (ui.perSecond) ui.perSecond.textContent = format(cps);
+  if (ui.coins && lastRenderedCoinValue !== state.coins) {
+    ui.coins.textContent = format(state.coins);
+    lastRenderedCoinValue = state.coins;
+  }
   if (ui.idleMinerCost) ui.idleMinerCost.textContent = idleMinerCost.toLocaleString();
   if (ui.idleMinerOwned) ui.idleMinerOwned.textContent = state.idleMinerOwned.toString();
   if (ui.buyIdleMiner) ui.buyIdleMiner.disabled = !canAfford(idleMinerCost);
@@ -1195,6 +1235,7 @@ bindUiEvents({
   buyCritChanceUpgrade,
   buyCritMultiplierUpgrade,
   buyChainReactionUpgrade,
+  buyEnchantBountifulUpgrade,
   unlockClassChoice,
   selectMinerSpecialization,
   setMinerTargeting,

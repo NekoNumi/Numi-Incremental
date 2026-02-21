@@ -17,10 +17,6 @@
             <span class="label">Coins</span>
             <strong id="coins">0</strong>
           </div>
-          <div>
-            <span class="label">Per second</span>
-            <strong id="per-second">0</strong>
-          </div>
           <button id="inventory-toggle" class="inventory-toggle-button">Inventory</button>
         </section>
       </header>
@@ -142,7 +138,6 @@
               <h3 id="miner-popup-title">Miner</h3>
               <button id="close-miner-popup" class="close-button" aria-label="Close miner panel">✕</button>
             </div>
-            <button id="popup-unlock-class" class="hidden">Unlock Class (250)</button>
             <button id="popup-choose-class" class="hidden">Choose Class</button>
             <div class="upgrade">
               <div class="upgrade-header">
@@ -219,6 +214,15 @@
               <small id="popup-chain-reaction-stat">Locked. 0% chance → Unlocks 1 adjacent chain</small>
               <span class="upgrade-cost-row">Cost: <span id="popup-chain-reaction-cost">0</span></span>
             </button>
+            <button id="popup-upgrade-enchant-bountiful" class="upgrade">
+              <div class="upgrade-header">
+                <span>✨ Enchant Bountiful</span>
+                <strong class="upgrade-quantity" id="popup-enchant-bountiful-level">0</strong>
+              </div>
+              <small id="popup-enchant-bountiful-stat">Current chance: 0% → Upgrading to: 15% to apply Bountiful enchantment</small>
+              <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-cost">0</span></span>
+            </button>
+            <button id="popup-unlock-class" class="hidden">Unlock Class (250)</button>
             <button id="popup-reposition">Reposition</button>
           </section>
         </section>
@@ -266,6 +270,10 @@
           <button id="class-pick-double-activation" class="upgrade">
             <div class="upgrade-header"><span>⏩ Multi Activator</span></div>
             <small>Unlocks min/max extra activation range upgrades</small>
+          </button>
+          <button id="class-pick-arcanist" class="upgrade">
+            <div class="upgrade-header"><span>✨ Arcanist</span></div>
+            <small>Unlocks Enchant Bountiful upgrades</small>
           </button>
         </div>
       </div>

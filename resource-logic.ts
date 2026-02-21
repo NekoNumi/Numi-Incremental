@@ -166,13 +166,69 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     return baseWeight * 1.2 ** (level - 1);
   }
 
+  function getUnlockedBaseWeight(ore: OreType): number {
+    if (ore === "sand") {
+      return getResourceByOre("sand").weight;
+    }
+
+    const level = getOreGenerationLevel(ore as UpgradableOre);
+    return level > 0 ? getResourceByOre(ore).weight : 0;
+  }
+
+  function buildRedistributedWeightMap(): Record<OreType, number> {
+    const redistributed: Record<OreType, number> = {
+      sand: getUnlockedBaseWeight("sand"),
+      coal: getUnlockedBaseWeight("coal"),
+      copper: getUnlockedBaseWeight("copper"),
+      iron: getUnlockedBaseWeight("iron"),
+      silver: getUnlockedBaseWeight("silver"),
+      gold: getUnlockedBaseWeight("gold"),
+    };
+
+    for (let index = 1; index < INVENTORY_ORES.length; index += 1) {
+      const ore = INVENTORY_ORES[index];
+      const level = getOreGenerationLevel(ore as UpgradableOre);
+      if (level <= 0) {
+        redistributed[ore] = 0;
+        continue;
+      }
+
+      const baseUnlockedWeight = getUnlockedBaseWeight(ore);
+      const targetWeight = getOreWeightForLevel(ore, level);
+      const bonusToAdd = Math.max(0, targetWeight - baseUnlockedWeight);
+      if (bonusToAdd <= 0) {
+        continue;
+      }
+
+      const lowerOres = INVENTORY_ORES.slice(0, index);
+      const availableFromLower = lowerOres.reduce((sum, lowerOre) => sum + redistributed[lowerOre], 0);
+      if (availableFromLower <= 0) {
+        continue;
+      }
+
+      const transfer = Math.min(bonusToAdd, availableFromLower);
+      for (const lowerOre of lowerOres) {
+        const currentLowerWeight = redistributed[lowerOre];
+        if (currentLowerWeight <= 0) {
+          continue;
+        }
+        const lowerShare = currentLowerWeight / availableFromLower;
+        redistributed[lowerOre] = Math.max(0, currentLowerWeight - transfer * lowerShare);
+      }
+
+      redistributed[ore] += transfer;
+    }
+
+    return redistributed;
+  }
+
   function getOreGenerationCost(ore: UpgradableOre): number {
     return getUpgradeCost(getOreUpgradeConfig(ore), getOreGenerationLevel(ore));
   }
 
   function getOreEffectiveWeight(ore: OreType): number {
-    const level = ore === "sand" ? 1 : getOreGenerationLevel(ore);
-    return getOreWeightForLevel(ore, level);
+    const redistributed = buildRedistributedWeightMap();
+    return redistributed[ore] || 0;
   }
 
   function getWeightedRoll(boostedOre: UpgradableOre | null, qualityMultiplier: number): OreType {
