@@ -534,6 +534,10 @@ strong {
   font-size: 0.9rem;
 }
 
+.dev-log-notes li {
+  white-space: pre-line;
+}
+
 .modal-actions {
   display: grid;
   gap: 0.55rem;
@@ -1059,6 +1063,18 @@ button {
 
 button:hover {
   filter: brightness(1.1);
+}
+
+#popup-unlock-class {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  transform: translateZ(0);
+}
+
+#popup-unlock-class:hover {
+  filter: none;
+  background: #2b3a61;
 }
 
 button:disabled {

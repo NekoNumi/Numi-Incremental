@@ -439,6 +439,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
       if (interactionState.placementMode) {
         if (window.innerWidth <= MOBILE_BREAKPOINT_PX) {
           event.preventDefault();
+          event.stopPropagation();
           placementDragActive = true;
           handlePlacementPointer(event.clientX, event.clientY, target);
           return;
@@ -458,6 +459,10 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
 
     ui.mapGrid.addEventListener("click", (event) => {
       if (!interactionState.placementMode) {
+        return;
+      }
+
+      if (window.innerWidth <= MOBILE_BREAKPOINT_PX) {
         return;
       }
 
@@ -564,6 +569,10 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
         return;
       }
 
+      if (window.innerWidth <= MOBILE_BREAKPOINT_PX) {
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       if (!(target instanceof HTMLElement)) {
         return;
@@ -620,7 +629,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     if (sellOneButton instanceof HTMLButtonElement) {
       const ore = sellOneButton.dataset.ore;
       if (isSellableOre(ore)) {
-        sellAllByResource(ore);
+        sellOneResource(ore);
       }
       return;
     }

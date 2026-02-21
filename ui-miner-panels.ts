@@ -189,6 +189,10 @@ interface MinerStatsViewModel {
   classStatRows: Array<{ label: string; value: string }>;
 }
 
+function getMinerPopupViewSignature(view: MinerPopupViewModel): string {
+  return JSON.stringify(view);
+}
+
 export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel): void {
   if (!ui.minerPopup) {
     return;
@@ -196,6 +200,12 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
 
   if (!view.isVisible) {
     ui.minerPopup.classList.add("hidden");
+    delete ui.minerPopup.dataset.viewSignature;
+    return;
+  }
+
+  const viewSignature = getMinerPopupViewSignature(view);
+  if (ui.minerPopup.dataset.viewSignature === viewSignature) {
     return;
   }
 
@@ -255,8 +265,16 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupSpecStatus) ui.popupSpecStatus.textContent = view.specStatus;
 
   if (ui.popupUnlockClass) {
-    ui.popupUnlockClass.classList.toggle("hidden", !view.canUnlockClass);
-    ui.popupUnlockClass.disabled = !view.canUnlockClass || !view.specAffordable;
+    const shouldHideUnlockClass = !view.canUnlockClass;
+    const isUnlockClassHidden = ui.popupUnlockClass.classList.contains("hidden");
+    if (isUnlockClassHidden !== shouldHideUnlockClass) {
+      ui.popupUnlockClass.classList.toggle("hidden", shouldHideUnlockClass);
+    }
+
+    const shouldDisableUnlockClass = !view.canUnlockClass || !view.specAffordable;
+    if (ui.popupUnlockClass.disabled !== shouldDisableUnlockClass) {
+      ui.popupUnlockClass.disabled = shouldDisableUnlockClass;
+    }
 
     if (view.canUnlockClass && ui.minerPopup) {
       const topUpgradeButton =
@@ -266,7 +284,10 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
         ui.popupReposition;
 
       if (topUpgradeButton && topUpgradeButton.parentElement === ui.minerPopup && ui.popupUnlockClass.parentElement === ui.minerPopup) {
-        ui.minerPopup.insertBefore(ui.popupUnlockClass, topUpgradeButton);
+        const isAlreadyBeforeTopUpgrade = ui.popupUnlockClass.nextElementSibling === topUpgradeButton;
+        if (!isAlreadyBeforeTopUpgrade) {
+          ui.minerPopup.insertBefore(ui.popupUnlockClass, topUpgradeButton);
+        }
       }
     }
   }
@@ -319,6 +340,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUpgradeEnrichMax) ui.popupUpgradeEnrichMax.disabled = !view.canBuyEnrichMax;
   if (ui.popupUpgradeEnrichChance) ui.popupUpgradeEnrichChance.disabled = !view.canBuyEnrichChance;
   if (ui.popupReposition) ui.popupReposition.textContent = view.placementMode ? "Click map to place…" : "Reposition";
+  ui.minerPopup.dataset.viewSignature = viewSignature;
 }
 
 export function renderMinerStatsPanelView(ui: MinerStatsUi, view: MinerStatsViewModel): void {
@@ -337,19 +359,24 @@ export function renderMinerStatsPanelView(ui: MinerStatsUi, view: MinerStatsView
   if (ui.statsMinerRate) ui.statsMinerRate.textContent = view.rateText;
   if (ui.statsMinerRadius) ui.statsMinerRadius.textContent = view.radiusText;
   if (ui.statsClassDetails) {
-    ui.statsClassDetails.innerHTML = "";
-    for (const statRow of view.classStatRows) {
-      const row = document.createElement("p");
-      row.className = "miner-stat-row";
+    const rowsSignature = view.classStatRows.map((statRow) => `${statRow.label}:${statRow.value}`).join("|");
+    const previousRowsSignature = ui.statsClassDetails.dataset.rowsSignature ?? "";
+    if (rowsSignature !== previousRowsSignature) {
+      ui.statsClassDetails.innerHTML = "";
+      for (const statRow of view.classStatRows) {
+        const row = document.createElement("p");
+        row.className = "miner-stat-row";
 
-      const labelNode = document.createElement("span");
-      labelNode.textContent = statRow.label;
+        const labelNode = document.createElement("span");
+        labelNode.textContent = statRow.label;
 
-      const valueNode = document.createElement("strong");
-      valueNode.textContent = statRow.value;
+        const valueNode = document.createElement("strong");
+        valueNode.textContent = statRow.value;
 
-      row.append(labelNode, valueNode);
-      ui.statsClassDetails.appendChild(row);
+        row.append(labelNode, valueNode);
+        ui.statsClassDetails.appendChild(row);
+      }
+      ui.statsClassDetails.dataset.rowsSignature = rowsSignature;
     }
   }
 }

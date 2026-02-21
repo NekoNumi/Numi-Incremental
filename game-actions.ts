@@ -3,6 +3,7 @@ import type { GameState, UpgradableOre } from "./game-types";
 interface CreateGameActionsArgs {
   state: GameState;
   maxMapSize: number;
+  maxIdleMiners: number;
   saveKey: string;
   clearSavedGame: (saveKey: string) => void;
   createDefaultResources: () => GameState["resources"];
@@ -39,6 +40,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
   const {
     state,
     maxMapSize,
+    maxIdleMiners,
     saveKey,
     clearSavedGame,
     createDefaultResources,
@@ -58,6 +60,12 @@ export function createGameActions(args: CreateGameActionsArgs): {
   } = args;
 
   function buyIdleMiner(): void {
+    if (state.idleMinerOwned >= maxIdleMiners) {
+      setStatus(`Worker cap reached (${maxIdleMiners}).`);
+      render();
+      return;
+    }
+
     const cost = getIdleMinerCost();
     if (!canAfford(cost)) {
       return;

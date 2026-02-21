@@ -1,8 +1,17 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1];
-const isGitHubActions = process.env.GITHUB_ACTIONS === "true";
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, ".", "");
+  const repositoryName = env.GITHUB_REPOSITORY?.split("/")[1];
+  const isGitHubActions = env.GITHUB_ACTIONS === "true";
 
-export default defineConfig({
-  base: isGitHubActions && repositoryName ? `/${repositoryName}/` : "/",
+  return {
+    base: isGitHubActions && repositoryName ? `/${repositoryName}/` : "/",
+    server: {
+      host: true,
+      port: 5173,
+      strictPort: true,
+      hmr: false,
+    },
+  };
 });
