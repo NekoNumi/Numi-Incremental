@@ -4,6 +4,7 @@ import {
   MAX_MAP_SIZE,
   MAP_SCALE,
   MOBILE_BREAKPOINT_PX,
+  MOBILE_MAX_MAP_SCALE,
   getMapPixelSizeAtScale,
   MIN_TILE_COVERAGE_IN_RADIUS,
   SAVE_KEY,
@@ -464,6 +465,8 @@ const enrichChanceUpgrade: UpgradeConfig = {
   growth: 1.36,
   cappedMax: true,
 };
+
+const MAX_IDLE_MINERS = 9;
 
 // UI Element references
 const ui: UIElements = {
@@ -1205,7 +1208,7 @@ function renderWorkersList(): void {
   if (state.idleMinerOwned <= 0) {
     const emptyState = document.createElement("p");
     emptyState.className = "workers-empty";
-    emptyState.textContent = "No workers yet. Buy an Idle Miner first.";
+    emptyState.textContent = "No workers yet. Add a Worker first.";
     ui.workersList.appendChild(emptyState);
     lastRenderedWorkersListSignature = signature;
     return;
@@ -1454,7 +1457,7 @@ function toggleLeftHandedMode(): void {
 
 function openWorkersPanel(): void {
   if (state.idleMinerOwned <= 0) {
-    setStatus("No workers yet. Buy an Idle Miner first.");
+    setStatus("No workers yet. Add a Worker first.");
     if (isMobileViewport()) {
       setWorkersModalOpen(true);
       return;
@@ -1617,6 +1620,10 @@ function addCoinsCheat(): void {
 }
 
 function syncIdleMinerState(): void {
+  if (state.idleMinerOwned > MAX_IDLE_MINERS) {
+    state.idleMinerOwned = MAX_IDLE_MINERS;
+  }
+
   while (state.idleMinerCooldowns.length < state.idleMinerOwned) {
     const minerIndex = state.idleMinerCooldowns.length;
     state.idleMinerCooldowns.push(getMinerCooldownSeconds(minerIndex));
@@ -1870,6 +1877,7 @@ const {
 } = createGameActions({
   state,
   maxMapSize: MAX_MAP_SIZE,
+  maxIdleMiners: MAX_IDLE_MINERS,
   saveKey: SAVE_KEY,
   clearSavedGame,
   createDefaultResources,
@@ -1946,29 +1954,27 @@ function syncMapScaleToContainer(mapSize: number): void {
   }
 
   const availableWidthPx = Math.max(0, Math.floor(mapContainer.clientWidth) - 2);
-  const availableHeightPx = Math.max(0, Math.floor(mapContainer.clientHeight) - 2);
   const isMobileLayout = window.innerWidth <= MOBILE_BREAKPOINT_PX;
-  const fitConstraintPx = isMobileLayout
-    ? Math.min(availableWidthPx, availableHeightPx || availableWidthPx)
-    : availableWidthPx;
+  const maxScale = isMobileLayout ? MOBILE_MAX_MAP_SCALE : VIEWPORT_MAP_SCALE;
+  const fitConstraintPx = availableWidthPx;
   if (!Number.isFinite(fitConstraintPx) || fitConstraintPx <= 0) {
     return;
   }
 
   const baseMapWidthPx = getMapPixelSizeAtScale(mapSize, VIEWPORT_MAP_SCALE);
   if (baseMapWidthPx <= 0) {
-    applyMapScale(VIEWPORT_MAP_SCALE);
+    applyMapScale(VIEWPORT_MAP_SCALE, { maxScale });
     return;
   }
 
-  const fitRatio = Math.min(1, fitConstraintPx / baseMapWidthPx);
-  applyMapScale(VIEWPORT_MAP_SCALE * fitRatio);
+  const fitRatio = isMobileLayout ? fitConstraintPx / baseMapWidthPx : Math.min(1, fitConstraintPx / baseMapWidthPx);
+  applyMapScale(VIEWPORT_MAP_SCALE * fitRatio, { maxScale });
 
   let fittedMapWidth = getMapPixelSize(mapSize);
   let attempts = 0;
   while (fittedMapWidth > fitConstraintPx && attempts < 4) {
     const correctionRatio = fitConstraintPx / Math.max(1, fittedMapWidth);
-    applyMapScale(MAP_SCALE * correctionRatio * 0.995);
+    applyMapScale(MAP_SCALE * correctionRatio * 0.995, { maxScale });
     fittedMapWidth = getMapPixelSize(mapSize);
     attempts += 1;
   }
@@ -2476,7 +2482,10 @@ function renderNow(): void {
   }
   if (ui.idleMinerCost) ui.idleMinerCost.textContent = idleMinerCost.toLocaleString();
   if (ui.idleMinerOwned) ui.idleMinerOwned.textContent = state.idleMinerOwned.toString();
-  if (ui.buyIdleMiner) ui.buyIdleMiner.disabled = !canAfford(idleMinerCost);
+  if (ui.buyIdleMiner) {
+    ui.buyIdleMiner.classList.toggle("hidden", state.idleMinerOwned >= MAX_IDLE_MINERS);
+    ui.buyIdleMiner.disabled = state.idleMinerOwned >= MAX_IDLE_MINERS || !canAfford(idleMinerCost);
+  }
   if (ui.mapExpandCost) ui.mapExpandCost.textContent = mapCost.toLocaleString();
   if (ui.mapExpansions) ui.mapExpansions.textContent = `${mapSize}x${mapSize}`;
   if (ui.mapSize) ui.mapSize.textContent = `${mapSize}x${mapSize}`;
@@ -2835,13 +2844,41 @@ setUpdateButtonText();
 
 window.addEventListener("resize", handleViewportResize);
 window.addEventListener("orientationchange", handleViewportResize);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", handleViewportResize);
+}
+
+const mapScaleContainer = ui.mapEnvironment ?? ui.mapGrid;
+if (mapScaleContainer && typeof ResizeObserver !== "undefined") {
+  let lastObservedWidth = Math.round(mapScaleContainer.clientWidth);
+  let lastObservedHeight = Math.round(mapScaleContainer.clientHeight);
+
+  const mapContainerResizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const observedWidth = Math.round(entry.contentRect.width);
+      const observedHeight = Math.round(entry.contentRect.height);
+      if (observedWidth === lastObservedWidth && observedHeight === lastObservedHeight) {
+        continue;
+      }
+
+      lastObservedWidth = observedWidth;
+      lastObservedHeight = observedHeight;
+      handleViewportResize();
+    }
+  });
+
+  mapContainerResizeObserver.observe(mapScaleContainer);
+}
 
 loadGame();
 state.lastTick = Date.now();
 renderNow();
 maybeShowDevLogForCurrentVersion();
 
-if ("serviceWorker" in navigator) {
+const serviceWorkerSupported = "serviceWorker" in navigator;
+const shouldRegisterServiceWorker = serviceWorkerSupported && import.meta.env.PROD;
+
+if (shouldRegisterServiceWorker) {
   window.addEventListener("focus", () => {
     checkForUpdateOnceOnFocusOrOpen();
   });

@@ -617,7 +617,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     if (sellOneButton instanceof HTMLButtonElement) {
       const ore = sellOneButton.dataset.ore;
       if (isSellableOre(ore)) {
-        sellAllByResource(ore);
+        sellOneResource(ore);
       }
       return;
     }

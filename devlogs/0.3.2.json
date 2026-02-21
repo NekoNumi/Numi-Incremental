@@ -1,0 +1,10 @@
+{
+  "version": "Version 0.3.2",
+  "releaseId": "0.3.2",
+  "notes": [
+    "Worker menu render optimization.",
+    "Added better map scaling for mobile",
+    "Capped worker quantity at 9"
+
+  ]
+}

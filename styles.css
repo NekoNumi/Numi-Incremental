@@ -1061,6 +1061,18 @@ button:hover {
   filter: brightness(1.1);
 }
 
+#popup-unlock-class {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  transform: translateZ(0);
+}
+
+#popup-unlock-class:hover {
+  filter: none;
+  background: #2b3a61;
+}
+
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
