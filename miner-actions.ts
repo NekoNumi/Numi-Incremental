@@ -9,7 +9,7 @@ interface CreateMinerActionsArgs {
   state: GameState;
   interactionState: MinerActionsInteractionState;
   canAfford: (cost: number) => boolean;
-  canUseClass: (minerIndex: number, spec: "Multi Activator" | "Prospector" | "Crit Build" | "Chain Lightning" | "Arcanist") => boolean;
+  canUseClass: (minerIndex: number, spec: "Multi Activator" | "Prospector" | "Crit Build" | "Chain Lightning" | "Arcanist" | "Enricher") => boolean;
   render: () => void;
   getMinerSpeedUpgradeCost: (minerIndex: number) => number;
   getMinerRadiusUpgradeCost: (minerIndex: number) => number;
@@ -21,6 +21,11 @@ interface CreateMinerActionsArgs {
   getCritMultiplierCost: (minerIndex: number) => number;
   getChainReactionCost: (minerIndex: number) => number;
   getEnchantBountifulCost: (minerIndex: number) => number;
+  getEnchantBountifulMinCost: (minerIndex: number) => number;
+  getEnchantBountifulMaxCost: (minerIndex: number) => number;
+  getEnrichMinCost: (minerIndex: number) => number;
+  getEnrichMaxCost: (minerIndex: number) => number;
+  getEnrichChanceCost: (minerIndex: number) => number;
 }
 
 export function createMinerActions(args: CreateMinerActionsArgs): {
@@ -34,6 +39,11 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
   buyCritMultiplierUpgrade: () => void;
   buyChainReactionUpgrade: () => void;
   buyEnchantBountifulUpgrade: () => void;
+  buyEnchantBountifulMinUpgrade: () => void;
+  buyEnchantBountifulMaxUpgrade: () => void;
+  buyEnrichMinUpgrade: () => void;
+  buyEnrichMaxUpgrade: () => void;
+  buyEnrichChanceUpgrade: () => void;
 } {
   const {
     state,
@@ -51,6 +61,11 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     getCritMultiplierCost,
     getChainReactionCost,
     getEnchantBountifulCost,
+    getEnchantBountifulMinCost,
+    getEnchantBountifulMaxCost,
+    getEnrichMinCost,
+    getEnrichMaxCost,
+    getEnrichChanceCost,
   } = args;
 
   function buyMinerSpeedUpgrade(): void {
@@ -215,6 +230,86 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     render();
   }
 
+  function buyEnchantBountifulMinUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Arcanist")) return;
+    const cost = getEnchantBountifulMinCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Arcanist") {
+      data.enchantBountifulMinLevel += 1;
+    }
+    render();
+  }
+
+  function buyEnchantBountifulMaxUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Arcanist")) return;
+    const cost = getEnchantBountifulMaxCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Arcanist") {
+      data.enchantBountifulMaxLevel += 1;
+    }
+    render();
+  }
+
+  function buyEnrichMinUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Enricher")) return;
+    const cost = getEnrichMinCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Enricher") {
+      data.enrichMinLevel += 1;
+    }
+    render();
+  }
+
+  function buyEnrichMaxUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Enricher")) return;
+    const cost = getEnrichMaxCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Enricher") {
+      data.enrichMaxLevel += 1;
+    }
+    render();
+  }
+
+  function buyEnrichChanceUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Enricher")) return;
+    const cost = getEnrichChanceCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Enricher") {
+      data.enrichChanceLevel += 1;
+    }
+    render();
+  }
+
   return {
     buyMinerSpeedUpgrade,
     buyMinerRadiusUpgrade,
@@ -226,5 +321,10 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     buyCritMultiplierUpgrade,
     buyChainReactionUpgrade,
     buyEnchantBountifulUpgrade,
+    buyEnchantBountifulMinUpgrade,
+    buyEnchantBountifulMaxUpgrade,
+    buyEnrichMinUpgrade,
+    buyEnrichMaxUpgrade,
+    buyEnrichChanceUpgrade,
   };
 }

@@ -37,6 +37,11 @@ interface CreateMinerLogicArgs {
   critMultiplierUpgrade: UpgradeConfig;
   chainReactionUpgrade: UpgradeConfig;
   enchantBountifulUpgrade: UpgradeConfig;
+  enchantBountifulMinUpgrade: UpgradeConfig;
+  enchantBountifulMaxUpgrade: UpgradeConfig;
+  enrichMinUpgrade: UpgradeConfig;
+  enrichMaxUpgrade: UpgradeConfig;
+  enrichChanceUpgrade: UpgradeConfig;
 }
 
 export function createMinerLogic(args: CreateMinerLogicArgs): {
@@ -53,6 +58,11 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getCritMultiplierCost: (minerIndex: number) => number;
   getChainReactionCost: (minerIndex: number) => number;
   getEnchantBountifulCost: (minerIndex: number) => number;
+  getEnchantBountifulMinCost: (minerIndex: number) => number;
+  getEnchantBountifulMaxCost: (minerIndex: number) => number;
+  getEnrichMinCost: (minerIndex: number) => number;
+  getEnrichMaxCost: (minerIndex: number) => number;
+  getEnrichChanceCost: (minerIndex: number) => number;
   getDoubleActivationMinPercent: (minerIndex: number) => number;
   getDoubleActivationMaxPercent: (minerIndex: number) => number;
   rollDoubleActivation: (minerIndex: number) => number;
@@ -68,16 +78,27 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getChainReactionChance: (minerIndex: number) => number;
   getChainReactionLength: (minerIndex: number) => number;
   getEnchantBountifulChance: (minerIndex: number) => number;
+  getEnchantBountifulMinMultiplier: (minerIndex: number) => number;
+  getEnchantBountifulMaxMultiplier: (minerIndex: number) => number;
+  getEnrichMinMultiplier: (minerIndex: number) => number;
+  getEnrichMaxMultiplier: (minerIndex: number) => number;
+  getEnrichChance: (minerIndex: number) => number;
   getCritChanceStatText: (minerIndex: number) => string;
   getCritMultiplierStatText: (minerIndex: number) => string;
   getChainReactionStatText: (minerIndex: number) => string;
   getEnchantBountifulStatText: (minerIndex: number) => string;
+  getEnchantBountifulMinStatText: (minerIndex: number) => string;
+  getEnchantBountifulMaxStatText: (minerIndex: number) => string;
+  getEnrichMinStatText: (minerIndex: number) => string;
+  getEnrichMaxStatText: (minerIndex: number) => string;
+  getEnrichChanceStatText: (minerIndex: number) => string;
   getMinerDisplayName: (minerIndex: number) => string;
   getMinerRingLabel: (minerIndex: number) => string;
   canOfferClassUnlock: (minerIndex: number) => boolean;
   canChooseSpecialization: (minerIndex: number) => boolean;
   canUseClass: (minerIndex: number, spec: UnitSpecialization) => boolean;
   isArcanistMiner: (minerIndex: number) => boolean;
+  isEnricherMiner: (minerIndex: number) => boolean;
   chooseTargetTile: (minerIndex: number, eligibleTiles: HTMLElement[]) => HTMLElement;
   getCoinsPerSecond: () => number;
   getMinerPosition: (minerIndex: number) => Position;
@@ -106,6 +127,11 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     critMultiplierUpgrade,
     chainReactionUpgrade,
     enchantBountifulUpgrade,
+    enchantBountifulMinUpgrade,
+    enchantBountifulMaxUpgrade,
+    enrichMinUpgrade,
+    enrichMaxUpgrade,
+    enrichChanceUpgrade,
   } = args;
 
   function getMinerUpgrade(minerIndex: number): Unit {
@@ -205,6 +231,36 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     return getUpgradeCost(enchantBountifulUpgrade, level);
   }
 
+  function getEnchantBountifulMinCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Arcanist" ? unit.specializationData.enchantBountifulMinLevel : 0;
+    return getUpgradeCost(enchantBountifulMinUpgrade, level);
+  }
+
+  function getEnchantBountifulMaxCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Arcanist" ? unit.specializationData.enchantBountifulMaxLevel : 0;
+    return getUpgradeCost(enchantBountifulMaxUpgrade, level);
+  }
+
+  function getEnrichMinCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Enricher" ? unit.specializationData.enrichMinLevel : 0;
+    return getUpgradeCost(enrichMinUpgrade, level);
+  }
+
+  function getEnrichMaxCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Enricher" ? unit.specializationData.enrichMaxLevel : 0;
+    return getUpgradeCost(enrichMaxUpgrade, level);
+  }
+
+  function getEnrichChanceCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Enricher" ? unit.specializationData.enrichChanceLevel : 0;
+    return getUpgradeCost(enrichChanceUpgrade, level);
+  }
+
   function canUseClass(minerIndex: number, spec: UnitSpecialization): boolean {
     const selected = getMinerUpgrade(minerIndex).specialization;
     return selected === spec;
@@ -212,6 +268,10 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function isArcanistMiner(minerIndex: number): boolean {
     return canUseClass(minerIndex, "Arcanist");
+  }
+
+  function isEnricherMiner(minerIndex: number): boolean {
+    return canUseClass(minerIndex, "Enricher");
   }
 
   function getDoubleActivationMinPercent(minerIndex: number): number {
@@ -336,6 +396,51 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     return Math.min(0.75, 0.15 + level * 0.1);
   }
 
+  function getEnchantBountifulMinMultiplier(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Arcanist")) {
+      return 1;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Arcanist" ? data.enchantBountifulMinLevel : 0;
+    return 2 + level * 0.2;
+  }
+
+  function getEnchantBountifulMaxMultiplier(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Arcanist")) {
+      return 1;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Arcanist" ? data.enchantBountifulMaxLevel : 0;
+    return 2 + level * 0.3;
+  }
+
+  function getEnrichMinMultiplier(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Enricher")) {
+      return 1;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichMinLevel : 0;
+    return 1.5 + level * 0.15;
+  }
+
+  function getEnrichMaxMultiplier(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Enricher")) {
+      return 1;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichMaxLevel : 0;
+    return 2 + level * 0.25;
+  }
+
+  function getEnrichChance(minerIndex: number): number {
+    if (!canUseClass(minerIndex, "Enricher")) {
+      return 0;
+    }
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichChanceLevel : 0;
+    return Math.min(0.95, 0.2 + level * 0.08);
+  }
+
   function getCritChanceStatText(minerIndex: number): string {
     const current = (getCritChance(minerIndex) * 100).toFixed(0);
     const data = getMinerUpgrade(minerIndex).specializationData;
@@ -365,6 +470,46 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     return `Current chance: ${current}% → Upgrading to: ${next}% to apply Bountiful enchantment`;
   }
 
+  function getEnchantBountifulMinStatText(minerIndex: number): string {
+    const current = getEnchantBountifulMinMultiplier(minerIndex).toFixed(2);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Arcanist" ? data.enchantBountifulMinLevel : 0;
+    const next = (2 + (level + 1) * 0.2).toFixed(2);
+    return `Current min: ${current}x → Upgrading to: ${next}x`;
+  }
+
+  function getEnchantBountifulMaxStatText(minerIndex: number): string {
+    const current = getEnchantBountifulMaxMultiplier(minerIndex).toFixed(2);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Arcanist" ? data.enchantBountifulMaxLevel : 0;
+    const next = (2 + (level + 1) * 0.3).toFixed(2);
+    return `Current max: ${current}x → Upgrading to: ${next}x`;
+  }
+
+  function getEnrichMinStatText(minerIndex: number): string {
+    const current = getEnrichMinMultiplier(minerIndex).toFixed(2);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichMinLevel : 0;
+    const next = (1.5 + (level + 1) * 0.15).toFixed(2);
+    return `Current min: ${current}x → Upgrading to: ${next}x`;
+  }
+
+  function getEnrichMaxStatText(minerIndex: number): string {
+    const current = getEnrichMaxMultiplier(minerIndex).toFixed(2);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichMaxLevel : 0;
+    const next = (2 + (level + 1) * 0.25).toFixed(2);
+    return `Current max: ${current}x → Upgrading to: ${next}x`;
+  }
+
+  function getEnrichChanceStatText(minerIndex: number): string {
+    const current = (getEnrichChance(minerIndex) * 100).toFixed(0);
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichChanceLevel : 0;
+    const next = (Math.min(0.95, 0.2 + (level + 1) * 0.08) * 100).toFixed(0);
+    return `Current chance: ${current}% → Upgrading to: ${next}%`;
+  }
+
   function getMinerDisplayName(minerIndex: number): string {
     const spec = getMinerUpgrade(minerIndex).specialization;
     const number = minerIndex + 1;
@@ -388,6 +533,9 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     if (upgrade.specialization === "Arcanist") {
       return `✨${minerIndex + 1}`;
     }
+    if (upgrade.specialization === "Enricher") {
+      return `💜${minerIndex + 1}`;
+    }
     return `W${minerIndex + 1}`;
   }
 
@@ -403,7 +551,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function chooseTargetTile(minerIndex: number, eligibleTiles: HTMLElement[]): HTMLElement {
     const specialization = getMinerUpgrade(minerIndex).specialization;
-    const targetPool = specialization === "Arcanist"
+    const targetPool = specialization === "Arcanist" || specialization === "Enricher"
       ? (() => {
           const resourceTiles = eligibleTiles.filter((tile) => {
             const tileType = (tile.dataset.tileType as OreType) || "sand";
@@ -502,6 +650,11 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getCritMultiplierCost,
     getChainReactionCost,
     getEnchantBountifulCost,
+    getEnchantBountifulMinCost,
+    getEnchantBountifulMaxCost,
+    getEnrichMinCost,
+    getEnrichMaxCost,
+    getEnrichChanceCost,
     getDoubleActivationMinPercent,
     getDoubleActivationMaxPercent,
     rollDoubleActivation,
@@ -517,16 +670,27 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getChainReactionChance,
     getChainReactionLength,
     getEnchantBountifulChance,
+    getEnchantBountifulMinMultiplier,
+    getEnchantBountifulMaxMultiplier,
+    getEnrichMinMultiplier,
+    getEnrichMaxMultiplier,
+    getEnrichChance,
     getCritChanceStatText,
     getCritMultiplierStatText,
     getChainReactionStatText,
     getEnchantBountifulStatText,
+    getEnchantBountifulMinStatText,
+    getEnchantBountifulMaxStatText,
+    getEnrichMinStatText,
+    getEnrichMaxStatText,
+    getEnrichChanceStatText,
     getMinerDisplayName,
     getMinerRingLabel,
     canOfferClassUnlock,
     canChooseSpecialization,
     canUseClass,
     isArcanistMiner,
+    isEnricherMiner,
     chooseTargetTile,
     getCoinsPerSecond,
     getMinerPosition,

@@ -495,7 +495,49 @@ strong {
 }
 
 .map-tile--enchant-bountiful {
-  background-image: linear-gradient(45deg, transparent 44%, rgb(255 255 255 / 90%) 49%, rgb(255 255 255 / 90%) 51%, transparent 56%);
+  --enchant-color: rgb(255 255 255 / var(--tile-enchant-opacity, 1));
+}
+
+.map-tile--enchant-enriched {
+  --enchant-color: rgb(179 120 255 / var(--tile-enchant-opacity, 1));
+}
+
+.map-tile--enchant-bountiful,
+.map-tile--enchant-enriched {
+  --enchant-step: 18px;
+  --enchant-width: 2px;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0,
+    transparent calc(var(--enchant-step) - var(--enchant-width)),
+    var(--enchant-color) calc(var(--enchant-step) - var(--enchant-width)),
+    var(--enchant-color) var(--enchant-step)
+  );
+}
+
+.map-tile--enchant-strength-1 {
+  --enchant-step: 20px;
+  --enchant-width: 2px;
+}
+
+.map-tile--enchant-strength-2 {
+  --enchant-step: 16px;
+  --enchant-width: 2px;
+}
+
+.map-tile--enchant-strength-3 {
+  --enchant-step: 13px;
+  --enchant-width: 2px;
+}
+
+.map-tile--enchant-strength-4 {
+  --enchant-step: 10px;
+  --enchant-width: 2px;
+}
+
+.map-tile--enchant-strength-5 {
+  --enchant-step: 8px;
+  --enchant-width: 2px;
 }
 
 button {

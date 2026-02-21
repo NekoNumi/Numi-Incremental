@@ -12,6 +12,11 @@ interface MinerPopupUi {
   popupCritMultiplierLevel: HTMLElement | null;
   popupChainReactionLevel: HTMLElement | null;
   popupEnchantBountifulLevel: HTMLElement | null;
+  popupEnchantBountifulMinLevel: HTMLElement | null;
+  popupEnchantBountifulMaxLevel: HTMLElement | null;
+  popupEnrichMinLevel: HTMLElement | null;
+  popupEnrichMaxLevel: HTMLElement | null;
+  popupEnrichChanceLevel: HTMLElement | null;
   popupSpeedCost: HTMLElement | null;
   popupRadiusCost: HTMLElement | null;
   popupDoubleActivationMinCost: HTMLElement | null;
@@ -21,6 +26,11 @@ interface MinerPopupUi {
   popupCritMultiplierCost: HTMLElement | null;
   popupChainReactionCost: HTMLElement | null;
   popupEnchantBountifulCost: HTMLElement | null;
+  popupEnchantBountifulMinCost: HTMLElement | null;
+  popupEnchantBountifulMaxCost: HTMLElement | null;
+  popupEnrichMinCost: HTMLElement | null;
+  popupEnrichMaxCost: HTMLElement | null;
+  popupEnrichChanceCost: HTMLElement | null;
   popupSpeedStat: HTMLElement | null;
   popupRadiusStat: HTMLElement | null;
   popupDoubleActivationMinStat: HTMLElement | null;
@@ -30,6 +40,11 @@ interface MinerPopupUi {
   popupCritMultiplierStat: HTMLElement | null;
   popupChainReactionStat: HTMLElement | null;
   popupEnchantBountifulStat: HTMLElement | null;
+  popupEnchantBountifulMinStat: HTMLElement | null;
+  popupEnchantBountifulMaxStat: HTMLElement | null;
+  popupEnrichMinStat: HTMLElement | null;
+  popupEnrichMaxStat: HTMLElement | null;
+  popupEnrichChanceStat: HTMLElement | null;
   popupSpecStatus: HTMLElement | null;
   popupUnlockClass: HTMLButtonElement | null;
   popupChooseClass: HTMLButtonElement | null;
@@ -43,6 +58,11 @@ interface MinerPopupUi {
   popupUpgradeCritMultiplier: HTMLButtonElement | null;
   popupUpgradeChainReaction: HTMLButtonElement | null;
   popupUpgradeEnchantBountiful: HTMLButtonElement | null;
+  popupUpgradeEnchantBountifulMin: HTMLButtonElement | null;
+  popupUpgradeEnchantBountifulMax: HTMLButtonElement | null;
+  popupUpgradeEnrichMin: HTMLButtonElement | null;
+  popupUpgradeEnrichMax: HTMLButtonElement | null;
+  popupUpgradeEnrichChance: HTMLButtonElement | null;
   popupUpgradeSpeed: HTMLButtonElement | null;
   popupUpgradeRadius: HTMLButtonElement | null;
   popupReposition: HTMLButtonElement | null;
@@ -60,6 +80,11 @@ interface MinerPopupViewModel {
   critMultiplierLevel: number;
   chainReactionLevel: number;
   enchantBountifulLevel: number;
+  enchantBountifulMinLevel: number;
+  enchantBountifulMaxLevel: number;
+  enrichMinLevel: number;
+  enrichMaxLevel: number;
+  enrichChanceLevel: number;
   speedCost: number;
   radiusCost: number;
   doubleActivationMinCost: number;
@@ -69,6 +94,11 @@ interface MinerPopupViewModel {
   critMultiplierCost: number;
   chainReactionCost: number;
   enchantBountifulCost: number;
+  enchantBountifulMinCost: number;
+  enchantBountifulMaxCost: number;
+  enrichMinCost: number;
+  enrichMaxCost: number;
+  enrichChanceCost: number;
   speedStat: string;
   radiusStat: string;
   doubleActivationMinStat: string;
@@ -78,6 +108,11 @@ interface MinerPopupViewModel {
   critMultiplierStat: string;
   chainReactionStat: string;
   enchantBountifulStat: string;
+  enchantBountifulMinStat: string;
+  enchantBountifulMaxStat: string;
+  enrichMinStat: string;
+  enrichMaxStat: string;
+  enrichChanceStat: string;
   specStatus: string;
   canUnlockClass: boolean;
   specAffordable: boolean;
@@ -88,6 +123,7 @@ interface MinerPopupViewModel {
   showCrit: boolean;
   showChainLightning: boolean;
   showArcanist: boolean;
+  showEnricher: boolean;
   canBuySpeed: boolean;
   canBuyRadius: boolean;
   canBuyDoubleActivationMin: boolean;
@@ -97,6 +133,11 @@ interface MinerPopupViewModel {
   canBuyCritMultiplier: boolean;
   canBuyChainReaction: boolean;
   canBuyEnchantBountiful: boolean;
+  canBuyEnchantBountifulMin: boolean;
+  canBuyEnchantBountifulMax: boolean;
+  canBuyEnrichMin: boolean;
+  canBuyEnrichMax: boolean;
+  canBuyEnrichChance: boolean;
   placementMode: boolean;
 }
 
@@ -145,6 +186,11 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupCritMultiplierLevel) ui.popupCritMultiplierLevel.textContent = view.critMultiplierLevel.toString();
   if (ui.popupChainReactionLevel) ui.popupChainReactionLevel.textContent = view.chainReactionLevel.toString();
   if (ui.popupEnchantBountifulLevel) ui.popupEnchantBountifulLevel.textContent = view.enchantBountifulLevel.toString();
+  if (ui.popupEnchantBountifulMinLevel) ui.popupEnchantBountifulMinLevel.textContent = view.enchantBountifulMinLevel.toString();
+  if (ui.popupEnchantBountifulMaxLevel) ui.popupEnchantBountifulMaxLevel.textContent = view.enchantBountifulMaxLevel.toString();
+  if (ui.popupEnrichMinLevel) ui.popupEnrichMinLevel.textContent = view.enrichMinLevel.toString();
+  if (ui.popupEnrichMaxLevel) ui.popupEnrichMaxLevel.textContent = view.enrichMaxLevel.toString();
+  if (ui.popupEnrichChanceLevel) ui.popupEnrichChanceLevel.textContent = view.enrichChanceLevel.toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = view.speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = view.radiusCost.toLocaleString();
   if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = view.doubleActivationMinCost.toLocaleString();
@@ -154,6 +200,11 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupCritMultiplierCost) ui.popupCritMultiplierCost.textContent = view.critMultiplierCost.toLocaleString();
   if (ui.popupChainReactionCost) ui.popupChainReactionCost.textContent = view.chainReactionCost.toLocaleString();
   if (ui.popupEnchantBountifulCost) ui.popupEnchantBountifulCost.textContent = view.enchantBountifulCost.toLocaleString();
+  if (ui.popupEnchantBountifulMinCost) ui.popupEnchantBountifulMinCost.textContent = view.enchantBountifulMinCost.toLocaleString();
+  if (ui.popupEnchantBountifulMaxCost) ui.popupEnchantBountifulMaxCost.textContent = view.enchantBountifulMaxCost.toLocaleString();
+  if (ui.popupEnrichMinCost) ui.popupEnrichMinCost.textContent = view.enrichMinCost.toLocaleString();
+  if (ui.popupEnrichMaxCost) ui.popupEnrichMaxCost.textContent = view.enrichMaxCost.toLocaleString();
+  if (ui.popupEnrichChanceCost) ui.popupEnrichChanceCost.textContent = view.enrichChanceCost.toLocaleString();
   if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = view.speedStat;
   if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = view.radiusStat;
   if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = view.doubleActivationMinStat;
@@ -163,6 +214,11 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupCritMultiplierStat) ui.popupCritMultiplierStat.textContent = view.critMultiplierStat;
   if (ui.popupChainReactionStat) ui.popupChainReactionStat.textContent = view.chainReactionStat;
   if (ui.popupEnchantBountifulStat) ui.popupEnchantBountifulStat.textContent = view.enchantBountifulStat;
+  if (ui.popupEnchantBountifulMinStat) ui.popupEnchantBountifulMinStat.textContent = view.enchantBountifulMinStat;
+  if (ui.popupEnchantBountifulMaxStat) ui.popupEnchantBountifulMaxStat.textContent = view.enchantBountifulMaxStat;
+  if (ui.popupEnrichMinStat) ui.popupEnrichMinStat.textContent = view.enrichMinStat;
+  if (ui.popupEnrichMaxStat) ui.popupEnrichMaxStat.textContent = view.enrichMaxStat;
+  if (ui.popupEnrichChanceStat) ui.popupEnrichChanceStat.textContent = view.enrichChanceStat;
   if (ui.popupSpecStatus) ui.popupSpecStatus.textContent = view.specStatus;
 
   if (ui.popupUnlockClass) {
@@ -191,6 +247,11 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.classList.toggle("hidden", !view.showCrit);
   if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.classList.toggle("hidden", !view.showChainLightning);
   if (ui.popupUpgradeEnchantBountiful) ui.popupUpgradeEnchantBountiful.classList.toggle("hidden", !view.showArcanist);
+  if (ui.popupUpgradeEnchantBountifulMin) ui.popupUpgradeEnchantBountifulMin.classList.toggle("hidden", !view.showArcanist);
+  if (ui.popupUpgradeEnchantBountifulMax) ui.popupUpgradeEnchantBountifulMax.classList.toggle("hidden", !view.showArcanist);
+  if (ui.popupUpgradeEnrichMin) ui.popupUpgradeEnrichMin.classList.toggle("hidden", !view.showEnricher);
+  if (ui.popupUpgradeEnrichMax) ui.popupUpgradeEnrichMax.classList.toggle("hidden", !view.showEnricher);
+  if (ui.popupUpgradeEnrichChance) ui.popupUpgradeEnrichChance.classList.toggle("hidden", !view.showEnricher);
 
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !view.canBuySpeed;
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !view.canBuyRadius;
@@ -201,6 +262,11 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUpgradeCritMultiplier) ui.popupUpgradeCritMultiplier.disabled = !view.canBuyCritMultiplier;
   if (ui.popupUpgradeChainReaction) ui.popupUpgradeChainReaction.disabled = !view.canBuyChainReaction;
   if (ui.popupUpgradeEnchantBountiful) ui.popupUpgradeEnchantBountiful.disabled = !view.canBuyEnchantBountiful;
+  if (ui.popupUpgradeEnchantBountifulMin) ui.popupUpgradeEnchantBountifulMin.disabled = !view.canBuyEnchantBountifulMin;
+  if (ui.popupUpgradeEnchantBountifulMax) ui.popupUpgradeEnchantBountifulMax.disabled = !view.canBuyEnchantBountifulMax;
+  if (ui.popupUpgradeEnrichMin) ui.popupUpgradeEnrichMin.disabled = !view.canBuyEnrichMin;
+  if (ui.popupUpgradeEnrichMax) ui.popupUpgradeEnrichMax.disabled = !view.canBuyEnrichMax;
+  if (ui.popupUpgradeEnrichChance) ui.popupUpgradeEnrichChance.disabled = !view.canBuyEnrichChance;
   if (ui.popupReposition) ui.popupReposition.textContent = view.placementMode ? "Click map to place…" : "Reposition";
 }
 

@@ -5,10 +5,16 @@ interface CreateTileActionsArgs {
   addInventory: (ore: OreType, amount: number) => void;
   getTileCoinValue: (ore: OreType) => number;
   isArcanistMiner: (minerIndex: number) => boolean;
+  isEnricherMiner: (minerIndex: number) => boolean;
   getCritChance: (minerIndex: number) => number;
   getCritMultiplier: (minerIndex: number) => number;
   getVeinFinderQualityMultiplier: (minerIndex: number) => number;
   getEnchantBountifulChance: (minerIndex: number) => number;
+  getEnchantBountifulMinMultiplier: (minerIndex: number) => number;
+  getEnchantBountifulMaxMultiplier: (minerIndex: number) => number;
+  getEnrichChance: (minerIndex: number) => number;
+  getEnrichMinMultiplier: (minerIndex: number) => number;
+  getEnrichMaxMultiplier: (minerIndex: number) => number;
   rollTileType: () => OreType;
   rollTileTypeWithBoostedOre: (boostedOre: UpgradableOre, qualityMultiplier: number) => OreType;
   getChainReactionChance: (minerIndex: number) => number;
@@ -28,10 +34,16 @@ export function createTileActions(args: CreateTileActionsArgs): {
     addInventory,
     getTileCoinValue,
     isArcanistMiner,
+    isEnricherMiner,
     getCritChance,
     getCritMultiplier,
     getVeinFinderQualityMultiplier,
     getEnchantBountifulChance,
+    getEnchantBountifulMinMultiplier,
+    getEnchantBountifulMaxMultiplier,
+    getEnrichChance,
+    getEnrichMinMultiplier,
+    getEnrichMaxMultiplier,
     rollTileType,
     rollTileTypeWithBoostedOre,
     getChainReactionChance,
@@ -51,12 +63,62 @@ export function createTileActions(args: CreateTileActionsArgs): {
   }
 
   function applyTileEnchantmentClasses(tile: HTMLElement): void {
-    tile.classList.remove("map-tile--enchant-bountiful");
+    tile.classList.remove(
+      "map-tile--enchant-bountiful",
+      "map-tile--enchant-enriched",
+      "map-tile--enchant-strength-1",
+      "map-tile--enchant-strength-2",
+      "map-tile--enchant-strength-3",
+      "map-tile--enchant-strength-4",
+      "map-tile--enchant-strength-5"
+    );
+
+    const clampStrengthLevel = (value: number): number => {
+      if (!Number.isFinite(value)) {
+        return 1;
+      }
+      return Math.max(1, Math.min(5, Math.round(value)));
+    };
+
+    const getTileEnchantmentStrengthLevel = (): number => {
+      const enchantment = (tile.dataset.tileEnchantment as TileEnchantment) || "none";
+      if (enchantment === "bountiful") {
+        const advantage = Number(tile.dataset.tileBountifulAdvantage);
+        return clampStrengthLevel(advantage);
+      }
+
+      if (enchantment === "enriched") {
+        const multiplier = Number(tile.dataset.tileEnrichMultiplier);
+        return clampStrengthLevel(multiplier);
+      }
+
+      return 1;
+    };
+
+    const getTileEnchantmentOpacity = (): number => {
+      const rawOpacity = Number(tile.dataset.tileEnchantmentOpacity);
+      if (!Number.isFinite(rawOpacity)) {
+        return 1;
+      }
+      return Math.max(0, Math.min(1, rawOpacity));
+    };
 
     const enchantment = (tile.dataset.tileEnchantment as TileEnchantment) || "none";
     if (enchantment === "bountiful") {
+      tile.style.setProperty("--tile-enchant-opacity", getTileEnchantmentOpacity().toFixed(4));
       tile.classList.add("map-tile--enchant-bountiful");
+      tile.classList.add(`map-tile--enchant-strength-${getTileEnchantmentStrengthLevel()}`);
+      return;
     }
+
+    if (enchantment === "enriched") {
+      tile.style.setProperty("--tile-enchant-opacity", getTileEnchantmentOpacity().toFixed(4));
+      tile.classList.add("map-tile--enchant-enriched");
+      tile.classList.add(`map-tile--enchant-strength-${getTileEnchantmentStrengthLevel()}`);
+      return;
+    }
+
+    tile.style.removeProperty("--tile-enchant-opacity");
   }
 
   function getTileAriaLabel(tileType: OreType): string {
@@ -91,7 +153,7 @@ export function createTileActions(args: CreateTileActionsArgs): {
     return getTileCoinValue(second) > getTileCoinValue(first) ? second : first;
   }
 
-  function rollRespawnTileType(minedOre: UpgradableOre | null, qualityMultiplier: number, isBountiful: boolean): OreType {
+  function rollRespawnTileType(minedOre: UpgradableOre | null, qualityMultiplier: number, bountifulAdvantage: number): OreType {
     const rollOnce = (): OreType => {
       if (minedOre && qualityMultiplier > 1) {
         return rollTileTypeWithBoostedOre(minedOre, qualityMultiplier);
@@ -100,12 +162,20 @@ export function createTileActions(args: CreateTileActionsArgs): {
     };
 
     const firstRoll = rollOnce();
-    if (!isBountiful) {
+    if (bountifulAdvantage <= 1) {
       return firstRoll;
     }
 
-    const secondRoll = rollOnce();
-    return pickHigherValueOre(firstRoll, secondRoll);
+    const fullRolls = Math.floor(bountifulAdvantage);
+    const remainderRollChance = bountifulAdvantage - fullRolls;
+    const totalRolls = fullRolls + (Math.random() < remainderRollChance ? 1 : 0);
+
+    let bestRoll = firstRoll;
+    for (let roll = 1; roll < Math.max(2, totalRolls); roll += 1) {
+      bestRoll = pickHigherValueOre(bestRoll, rollOnce());
+    }
+
+    return bestRoll;
   }
 
   function activateTile(tile: HTMLElement, shouldRender: boolean = true, minerIndex: number | null = null): boolean {
@@ -117,8 +187,33 @@ export function createTileActions(args: CreateTileActionsArgs): {
 
     if (minerIndex !== null && isArcanistMiner(minerIndex)) {
       const enchantment = tile.dataset.tileEnchantment as TileEnchantment;
-      if (enchantment === "none" && Math.random() < getEnchantBountifulChance(minerIndex)) {
+      const enchantChance = getEnchantBountifulChance(minerIndex);
+      if (enchantment === "none" && Math.random() < enchantChance) {
+        const min = getEnchantBountifulMinMultiplier(minerIndex);
+        const max = Math.max(min, getEnchantBountifulMaxMultiplier(minerIndex));
+        const bountifulAdvantage = min + Math.random() * (max - min);
         tile.dataset.tileEnchantment = "bountiful";
+        tile.dataset.tileEnchantmentOpacity = enchantChance.toFixed(4);
+        tile.dataset.tileBountifulAdvantage = bountifulAdvantage.toFixed(4);
+        applyTileEnchantmentClasses(tile);
+        if (shouldRender) {
+          render();
+        }
+        return true;
+      }
+      return false;
+    }
+
+    if (minerIndex !== null && isEnricherMiner(minerIndex)) {
+      const enchantment = tile.dataset.tileEnchantment as TileEnchantment;
+      const enchantChance = getEnrichChance(minerIndex);
+      if (enchantment === "none" && Math.random() < enchantChance) {
+        const min = getEnrichMinMultiplier(minerIndex);
+        const max = Math.max(min, getEnrichMaxMultiplier(minerIndex));
+        const enrichMultiplier = min + Math.random() * (max - min);
+        tile.dataset.tileEnchantment = "enriched";
+        tile.dataset.tileEnchantmentOpacity = enchantChance.toFixed(4);
+        tile.dataset.tileEnrichMultiplier = enrichMultiplier.toFixed(4);
         applyTileEnchantmentClasses(tile);
         if (shouldRender) {
           render();
@@ -131,16 +226,31 @@ export function createTileActions(args: CreateTileActionsArgs): {
     const tileType = (tile.dataset.tileType as OreType) || "sand";
     const isCrit = minerIndex !== null && Math.random() < getCritChance(minerIndex);
     const critMultiplier = minerIndex !== null ? getCritMultiplier(minerIndex) : 1;
+    const isEnriched = tile.dataset.tileEnchantment === "enriched";
+    const enrichMultiplier = isEnriched ? Math.max(1, Number(tile.dataset.tileEnrichMultiplier) || 1) : 1;
 
-    let quantity = 1;
+    let quantity = enrichMultiplier;
     if (isCrit) {
       const bonusFromMultiplier = Math.max(0, critMultiplier - 1);
       const guaranteedBonus = Math.floor(bonusFromMultiplier);
       const remainderBonus = bonusFromMultiplier - guaranteedBonus;
       const rolledBonus = Math.random() < remainderBonus ? 1 : 0;
-      quantity = 1 + guaranteedBonus + rolledBonus;
+      quantity *= 1 + guaranteedBonus + rolledBonus;
     }
+
+    const guaranteedQuantity = Math.floor(quantity);
+    const remainderQuantity = quantity - guaranteedQuantity;
+    quantity = guaranteedQuantity + (Math.random() < remainderQuantity ? 1 : 0);
+    quantity = Math.max(1, quantity);
+
     addInventory(tileType, quantity);
+
+    if (isEnriched) {
+      tile.dataset.tileEnchantment = "none";
+      delete tile.dataset.tileEnchantmentOpacity;
+      delete tile.dataset.tileEnrichMultiplier;
+      applyTileEnchantmentClasses(tile);
+    }
 
     if (minerIndex !== null && Math.random() < getEnchantBountifulChance(minerIndex)) {
       tile.dataset.tileEnchantment = "bountiful";
@@ -154,13 +264,16 @@ export function createTileActions(args: CreateTileActionsArgs): {
     const minedOre = tileType === "sand" ? null : (tileType as UpgradableOre);
     const qualityMultiplier = minerIndex === null ? 1 : getVeinFinderQualityMultiplier(minerIndex);
     const isBountiful = tile.dataset.tileEnchantment === "bountiful";
+    const bountifulAdvantage = isBountiful ? Math.max(1, Number(tile.dataset.tileBountifulAdvantage) || 2) : 1;
 
     setTimeout(() => {
       tile.classList.remove("map-tile--cooldown");
-      const respawnTileType = rollRespawnTileType(minedOre, qualityMultiplier, isBountiful);
+      const respawnTileType = rollRespawnTileType(minedOre, qualityMultiplier, bountifulAdvantage);
 
       if (isBountiful) {
         tile.dataset.tileEnchantment = "none";
+        delete tile.dataset.tileEnchantmentOpacity;
+        delete tile.dataset.tileBountifulAdvantage;
       }
 
       applyTileType(tile, respawnTileType);

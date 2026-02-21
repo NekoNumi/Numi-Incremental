@@ -11,7 +11,9 @@ export function getDefaultSpecializationData(specialization: UnitSpecialization)
     case "Multi Activator":
       return { type: specialization, multiActivationMinLevel: 0, multiActivationMaxLevel: 0 };
     case "Arcanist":
-      return { type: specialization, enchantBountifulLevel: 0 };
+      return { type: specialization, enchantBountifulLevel: 0, enchantBountifulMinLevel: 0, enchantBountifulMaxLevel: 0 };
+    case "Enricher":
+      return { type: specialization, enrichMinLevel: 0, enrichMaxLevel: 0, enrichChanceLevel: 0 };
     default:
       return { type: "Worker" };
   }
@@ -29,6 +31,8 @@ export function normalizeSpecialization(value: unknown): UnitSpecialization {
       return "Multi Activator";
     case "Arcanist":
       return "Arcanist";
+    case "Enricher":
+      return "Enricher";
     default:
       return "Worker";
   }
@@ -63,6 +67,15 @@ export function buildSpecializationData(raw: Record<string, unknown>, specializa
       return {
         type: "Arcanist",
         enchantBountifulLevel: Number(raw.enchantBountifulLevel) || 0,
+        enchantBountifulMinLevel: Number(raw.enchantBountifulMinLevel) || 0,
+        enchantBountifulMaxLevel: Number(raw.enchantBountifulMaxLevel) || 0,
+      };
+    case "Enricher":
+      return {
+        type: "Enricher",
+        enrichMinLevel: Number(raw.enrichMinLevel) || 0,
+        enrichMaxLevel: Number(raw.enrichMaxLevel) || 0,
+        enrichChanceLevel: Number(raw.enrichChanceLevel) || 0,
       };
     default:
       return { type: "Worker" };
@@ -81,6 +94,8 @@ export function getSpecializationLabel(value: UnitSpecialization): string {
       return "⏩ Multi Activator";
     case "Arcanist":
       return "✨ Arcanist";
+    case "Enricher":
+      return "💜 Enricher";
     default:
       return "Worker";
   }

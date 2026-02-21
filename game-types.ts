@@ -1,8 +1,8 @@
 export type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold";
 export type UpgradableOre = Exclude<OreType, "sand">;
-export type TileEnchantment = "none" | "bountiful" | "enchantment-a";
+export type TileEnchantment = "none" | "bountiful" | "enriched";
 
-export type UnitSpecialization = "Worker" | "Crit Build" | "Chain Lightning" | "Prospector" | "Multi Activator" | "Arcanist";
+export type UnitSpecialization = "Worker" | "Crit Build" | "Chain Lightning" | "Prospector" | "Multi Activator" | "Arcanist" | "Enricher";
 export type MinerTargeting = "random" | "high-quality" | "low-quality";
 
 export interface Unit {
@@ -20,7 +20,8 @@ export type UnitSpecializationData =
   | { type: "Chain Lightning"; chainReactionLevel: number; chainReactionChanceLevel: number }
   | { type: "Prospector"; veinFinderLevel: number }
   | { type: "Multi Activator"; multiActivationMinLevel: number; multiActivationMaxLevel: number }
-  | { type: "Arcanist"; enchantBountifulLevel: number };
+  | { type: "Arcanist"; enchantBountifulLevel: number; enchantBountifulMinLevel: number; enchantBountifulMaxLevel: number }
+  | { type: "Enricher"; enrichMinLevel: number; enrichMaxLevel: number; enrichChanceLevel: number };
 
 export interface Position {
   x: number;

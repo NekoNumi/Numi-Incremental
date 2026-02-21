@@ -135,6 +135,26 @@ interface UIElements {
   popupEnchantBountifulCost: HTMLElement | null;
   popupEnchantBountifulLevel: HTMLElement | null;
   popupEnchantBountifulStat: HTMLElement | null;
+  popupUpgradeEnchantBountifulMin: HTMLButtonElement | null;
+  popupEnchantBountifulMinCost: HTMLElement | null;
+  popupEnchantBountifulMinLevel: HTMLElement | null;
+  popupEnchantBountifulMinStat: HTMLElement | null;
+  popupUpgradeEnchantBountifulMax: HTMLButtonElement | null;
+  popupEnchantBountifulMaxCost: HTMLElement | null;
+  popupEnchantBountifulMaxLevel: HTMLElement | null;
+  popupEnchantBountifulMaxStat: HTMLElement | null;
+  popupUpgradeEnrichMin: HTMLButtonElement | null;
+  popupEnrichMinCost: HTMLElement | null;
+  popupEnrichMinLevel: HTMLElement | null;
+  popupEnrichMinStat: HTMLElement | null;
+  popupUpgradeEnrichMax: HTMLButtonElement | null;
+  popupEnrichMaxCost: HTMLElement | null;
+  popupEnrichMaxLevel: HTMLElement | null;
+  popupEnrichMaxStat: HTMLElement | null;
+  popupUpgradeEnrichChance: HTMLButtonElement | null;
+  popupEnrichChanceCost: HTMLElement | null;
+  popupEnrichChanceLevel: HTMLElement | null;
+  popupEnrichChanceStat: HTMLElement | null;
   popupSpecStatus: HTMLElement | null;
   popupUnlockClass: HTMLButtonElement | null;
   popupChooseClass: HTMLButtonElement | null;
@@ -147,6 +167,7 @@ interface UIElements {
   classPickChainLightning: HTMLButtonElement | null;
   classPickDoubleActivation: HTMLButtonElement | null;
   classPickArcanist: HTMLButtonElement | null;
+  classPickEnricher: HTMLButtonElement | null;
   classModalClose: HTMLButtonElement | null;
   minerStatsPanel: HTMLElement | null;
   minerStatsTitle: HTMLElement | null;
@@ -273,6 +294,31 @@ const enchantBountifulUpgrade: UpgradeConfig = {
   growth: 1.4,
 };
 
+const enchantBountifulMinUpgrade: UpgradeConfig = {
+  baseCost: 320,
+  growth: 1.34,
+};
+
+const enchantBountifulMaxUpgrade: UpgradeConfig = {
+  baseCost: 360,
+  growth: 1.38,
+};
+
+const enrichMinUpgrade: UpgradeConfig = {
+  baseCost: 340,
+  growth: 1.35,
+};
+
+const enrichMaxUpgrade: UpgradeConfig = {
+  baseCost: 380,
+  growth: 1.4,
+};
+
+const enrichChanceUpgrade: UpgradeConfig = {
+  baseCost: 320,
+  growth: 1.36,
+};
+
 // UI Element references
 const ui: UIElements = {
   coins: document.getElementById("coins"),
@@ -362,6 +408,26 @@ const ui: UIElements = {
   popupEnchantBountifulCost: document.getElementById("popup-enchant-bountiful-cost"),
   popupEnchantBountifulLevel: document.getElementById("popup-enchant-bountiful-level"),
   popupEnchantBountifulStat: document.getElementById("popup-enchant-bountiful-stat"),
+  popupUpgradeEnchantBountifulMin: document.getElementById("popup-upgrade-enchant-bountiful-min") as HTMLButtonElement,
+  popupEnchantBountifulMinCost: document.getElementById("popup-enchant-bountiful-min-cost"),
+  popupEnchantBountifulMinLevel: document.getElementById("popup-enchant-bountiful-min-level"),
+  popupEnchantBountifulMinStat: document.getElementById("popup-enchant-bountiful-min-stat"),
+  popupUpgradeEnchantBountifulMax: document.getElementById("popup-upgrade-enchant-bountiful-max") as HTMLButtonElement,
+  popupEnchantBountifulMaxCost: document.getElementById("popup-enchant-bountiful-max-cost"),
+  popupEnchantBountifulMaxLevel: document.getElementById("popup-enchant-bountiful-max-level"),
+  popupEnchantBountifulMaxStat: document.getElementById("popup-enchant-bountiful-max-stat"),
+  popupUpgradeEnrichMin: document.getElementById("popup-upgrade-enrich-min") as HTMLButtonElement,
+  popupEnrichMinCost: document.getElementById("popup-enrich-min-cost"),
+  popupEnrichMinLevel: document.getElementById("popup-enrich-min-level"),
+  popupEnrichMinStat: document.getElementById("popup-enrich-min-stat"),
+  popupUpgradeEnrichMax: document.getElementById("popup-upgrade-enrich-max") as HTMLButtonElement,
+  popupEnrichMaxCost: document.getElementById("popup-enrich-max-cost"),
+  popupEnrichMaxLevel: document.getElementById("popup-enrich-max-level"),
+  popupEnrichMaxStat: document.getElementById("popup-enrich-max-stat"),
+  popupUpgradeEnrichChance: document.getElementById("popup-upgrade-enrich-chance") as HTMLButtonElement,
+  popupEnrichChanceCost: document.getElementById("popup-enrich-chance-cost"),
+  popupEnrichChanceLevel: document.getElementById("popup-enrich-chance-level"),
+  popupEnrichChanceStat: document.getElementById("popup-enrich-chance-stat"),
   popupSpecStatus: document.getElementById("popup-spec-status"),
   popupUnlockClass: document.getElementById("popup-unlock-class") as HTMLButtonElement,
   popupChooseClass: document.getElementById("popup-choose-class") as HTMLButtonElement,
@@ -374,6 +440,7 @@ const ui: UIElements = {
   classPickChainLightning: document.getElementById("class-pick-chain-lightning") as HTMLButtonElement,
   classPickDoubleActivation: document.getElementById("class-pick-double-activation") as HTMLButtonElement,
   classPickArcanist: document.getElementById("class-pick-arcanist") as HTMLButtonElement,
+  classPickEnricher: document.getElementById("class-pick-enricher") as HTMLButtonElement,
   classModalClose: document.getElementById("close-class-modal") as HTMLButtonElement,
   minerStatsPanel: document.getElementById("miner-stats-panel"),
   minerStatsTitle: document.getElementById("miner-stats-title"),
@@ -446,6 +513,11 @@ const {
   getCritMultiplierCost,
   getChainReactionCost,
   getEnchantBountifulCost,
+  getEnchantBountifulMinCost,
+  getEnchantBountifulMaxCost,
+  getEnrichMinCost,
+  getEnrichMaxCost,
+  getEnrichChanceCost,
   getDoubleActivationMinPercent,
   getDoubleActivationMaxPercent,
   rollDoubleActivation,
@@ -461,16 +533,27 @@ const {
   getChainReactionChance,
   getChainReactionLength,
   getEnchantBountifulChance,
+  getEnchantBountifulMinMultiplier,
+  getEnchantBountifulMaxMultiplier,
+  getEnrichChance,
+  getEnrichMinMultiplier,
+  getEnrichMaxMultiplier,
   getCritChanceStatText,
   getCritMultiplierStatText,
   getChainReactionStatText,
   getEnchantBountifulStatText,
+  getEnchantBountifulMinStatText,
+  getEnchantBountifulMaxStatText,
+  getEnrichMinStatText,
+  getEnrichMaxStatText,
+  getEnrichChanceStatText,
   getMinerDisplayName,
   getMinerRingLabel,
   canOfferClassUnlock,
   canChooseSpecialization,
   canUseClass,
   isArcanistMiner,
+  isEnricherMiner,
   chooseTargetTile,
   getCoinsPerSecond,
   getMinerPosition,
@@ -498,6 +581,11 @@ const {
   critMultiplierUpgrade,
   chainReactionUpgrade,
   enchantBountifulUpgrade,
+  enchantBountifulMinUpgrade,
+  enchantBountifulMaxUpgrade,
+  enrichMinUpgrade,
+  enrichMaxUpgrade,
+  enrichChanceUpgrade,
 });
 
 const requestRender = createRenderScheduler(() => renderNow());
@@ -765,6 +853,7 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
   },
   getTileCoinValue,
   isArcanistMiner,
+  isEnricherMiner,
   getCritChance,
   getCritMultiplier,
   getVeinFinderQualityMultiplier,
@@ -773,6 +862,11 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
   getChainReactionChance,
   getChainReactionLength,
   getEnchantBountifulChance,
+  getEnchantBountifulMinMultiplier,
+  getEnchantBountifulMaxMultiplier,
+  getEnrichChance,
+  getEnrichMinMultiplier,
+  getEnrichMaxMultiplier,
   render,
 });
 
@@ -787,6 +881,11 @@ const {
   buyCritMultiplierUpgrade,
   buyChainReactionUpgrade,
   buyEnchantBountifulUpgrade,
+  buyEnchantBountifulMinUpgrade,
+  buyEnchantBountifulMaxUpgrade,
+  buyEnrichMinUpgrade,
+  buyEnrichMaxUpgrade,
+  buyEnrichChanceUpgrade,
 } = createMinerActions({
   state,
   interactionState,
@@ -803,6 +902,11 @@ const {
   getCritMultiplierCost,
   getChainReactionCost,
   getEnchantBountifulCost,
+  getEnchantBountifulMinCost,
+  getEnchantBountifulMaxCost,
+  getEnrichMinCost,
+  getEnrichMaxCost,
+  getEnrichChanceCost,
 });
 
 const {
@@ -916,6 +1020,11 @@ function renderMinerPopup(): void {
       critMultiplierLevel: 0,
       chainReactionLevel: 0,
       enchantBountifulLevel: 0,
+      enchantBountifulMinLevel: 0,
+      enchantBountifulMaxLevel: 0,
+      enrichMinLevel: 0,
+      enrichMaxLevel: 0,
+      enrichChanceLevel: 0,
       speedCost: 0,
       radiusCost: 0,
       doubleActivationMinCost: 0,
@@ -925,6 +1034,11 @@ function renderMinerPopup(): void {
       critMultiplierCost: 0,
       chainReactionCost: 0,
       enchantBountifulCost: 0,
+      enchantBountifulMinCost: 0,
+      enchantBountifulMaxCost: 0,
+      enrichMinCost: 0,
+      enrichMaxCost: 0,
+      enrichChanceCost: 0,
       speedStat: "",
       radiusStat: "",
       doubleActivationMinStat: "",
@@ -934,6 +1048,11 @@ function renderMinerPopup(): void {
       critMultiplierStat: "",
       chainReactionStat: "",
       enchantBountifulStat: "",
+      enchantBountifulMinStat: "",
+      enchantBountifulMaxStat: "",
+      enrichMinStat: "",
+      enrichMaxStat: "",
+      enrichChanceStat: "",
       specStatus: "",
       canUnlockClass: false,
       specAffordable: false,
@@ -944,6 +1063,7 @@ function renderMinerPopup(): void {
       showCrit: false,
       showChainLightning: false,
       showArcanist: false,
+      showEnricher: false,
       canBuySpeed: false,
       canBuyRadius: false,
       canBuyDoubleActivationMin: false,
@@ -953,6 +1073,11 @@ function renderMinerPopup(): void {
       canBuyCritMultiplier: false,
       canBuyChainReaction: false,
       canBuyEnchantBountiful: false,
+      canBuyEnchantBountifulMin: false,
+      canBuyEnchantBountifulMax: false,
+      canBuyEnrichMin: false,
+      canBuyEnrichMax: false,
+      canBuyEnrichChance: false,
       placementMode: interactionState.placementMode,
     });
     return;
@@ -968,6 +1093,11 @@ function renderMinerPopup(): void {
   const critMultiplierCost = getCritMultiplierCost(minerIndex);
   const chainReactionCost = getChainReactionCost(minerIndex);
   const enchantBountifulCost = getEnchantBountifulCost(minerIndex);
+  const enchantBountifulMinCost = getEnchantBountifulMinCost(minerIndex);
+  const enchantBountifulMaxCost = getEnchantBountifulMaxCost(minerIndex);
+  const enrichMinCost = getEnrichMinCost(minerIndex);
+  const enrichMaxCost = getEnrichMaxCost(minerIndex);
+  const enrichChanceCost = getEnrichChanceCost(minerIndex);
   const canUnlockClass = canOfferClassUnlock(minerIndex);
   const canSpec = canChooseSpecialization(minerIndex);
   const selectedSpec = upgrade.specialization;
@@ -977,11 +1107,13 @@ function renderMinerPopup(): void {
   const showCrit = selectedSpec === "Crit Build";
   const showChainLightning = selectedSpec === "Chain Lightning";
   const showArcanist = selectedSpec === "Arcanist";
+  const showEnricher = selectedSpec === "Enricher";
   const multiData = upgrade.specializationData.type === "Multi Activator" ? upgrade.specializationData : null;
   const prospectorData = upgrade.specializationData.type === "Prospector" ? upgrade.specializationData : null;
   const critData = upgrade.specializationData.type === "Crit Build" ? upgrade.specializationData : null;
   const chainData = upgrade.specializationData.type === "Chain Lightning" ? upgrade.specializationData : null;
   const arcanistData = upgrade.specializationData.type === "Arcanist" ? upgrade.specializationData : null;
+  const enricherData = upgrade.specializationData.type === "Enricher" ? upgrade.specializationData : null;
 
   const specStatus = selectedSpec !== "Worker"
     ? `Specialization: ${getSpecializationLabel(selectedSpec)}`
@@ -1003,6 +1135,11 @@ function renderMinerPopup(): void {
     critMultiplierLevel: critData?.critMultiplierLevel ?? 0,
     chainReactionLevel: chainData?.chainReactionLevel ?? 0,
     enchantBountifulLevel: arcanistData?.enchantBountifulLevel ?? 0,
+    enchantBountifulMinLevel: arcanistData?.enchantBountifulMinLevel ?? 0,
+    enchantBountifulMaxLevel: arcanistData?.enchantBountifulMaxLevel ?? 0,
+    enrichMinLevel: enricherData?.enrichMinLevel ?? 0,
+    enrichMaxLevel: enricherData?.enrichMaxLevel ?? 0,
+    enrichChanceLevel: enricherData?.enrichChanceLevel ?? 0,
     speedCost,
     radiusCost,
     doubleActivationMinCost,
@@ -1012,6 +1149,11 @@ function renderMinerPopup(): void {
     critMultiplierCost,
     chainReactionCost,
     enchantBountifulCost,
+    enchantBountifulMinCost,
+    enchantBountifulMaxCost,
+    enrichMinCost,
+    enrichMaxCost,
+    enrichChanceCost,
     speedStat: getMinerSpeedStatText(minerIndex),
     radiusStat: getMinerRadiusStatText(minerIndex),
     doubleActivationMinStat: getDoubleActivationMinStatText(minerIndex),
@@ -1021,6 +1163,11 @@ function renderMinerPopup(): void {
     critMultiplierStat: getCritMultiplierStatText(minerIndex),
     chainReactionStat: getChainReactionStatText(minerIndex),
     enchantBountifulStat: getEnchantBountifulStatText(minerIndex),
+    enchantBountifulMinStat: getEnchantBountifulMinStatText(minerIndex),
+    enchantBountifulMaxStat: getEnchantBountifulMaxStatText(minerIndex),
+    enrichMinStat: getEnrichMinStatText(minerIndex),
+    enrichMaxStat: getEnrichMaxStatText(minerIndex),
+    enrichChanceStat: getEnrichChanceStatText(minerIndex),
     specStatus,
     canUnlockClass,
     specAffordable,
@@ -1031,6 +1178,7 @@ function renderMinerPopup(): void {
     showCrit,
     showChainLightning,
     showArcanist,
+    showEnricher,
     canBuySpeed: canAfford(speedCost),
     canBuyRadius: canAfford(radiusCost),
     canBuyDoubleActivationMin: canAfford(doubleActivationMinCost) && canUseClass(minerIndex, "Multi Activator"),
@@ -1040,6 +1188,11 @@ function renderMinerPopup(): void {
     canBuyCritMultiplier: canAfford(critMultiplierCost) && canUseClass(minerIndex, "Crit Build"),
     canBuyChainReaction: canAfford(chainReactionCost) && canUseClass(minerIndex, "Chain Lightning"),
     canBuyEnchantBountiful: canAfford(enchantBountifulCost) && canUseClass(minerIndex, "Arcanist"),
+    canBuyEnchantBountifulMin: canAfford(enchantBountifulMinCost) && canUseClass(minerIndex, "Arcanist"),
+    canBuyEnchantBountifulMax: canAfford(enchantBountifulMaxCost) && canUseClass(minerIndex, "Arcanist"),
+    canBuyEnrichMin: canAfford(enrichMinCost) && canUseClass(minerIndex, "Enricher"),
+    canBuyEnrichMax: canAfford(enrichMaxCost) && canUseClass(minerIndex, "Enricher"),
+    canBuyEnrichChance: canAfford(enrichChanceCost) && canUseClass(minerIndex, "Enricher"),
     placementMode: interactionState.placementMode,
   });
 }
@@ -1236,6 +1389,11 @@ bindUiEvents({
   buyCritMultiplierUpgrade,
   buyChainReactionUpgrade,
   buyEnchantBountifulUpgrade,
+  buyEnchantBountifulMinUpgrade,
+  buyEnchantBountifulMaxUpgrade,
+  buyEnrichMinUpgrade,
+  buyEnrichMaxUpgrade,
+  buyEnrichChanceUpgrade,
   unlockClassChoice,
   selectMinerSpecialization,
   setMinerTargeting,
