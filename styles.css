@@ -1082,6 +1082,16 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button.update-ready {
+  background: #2f7f3c;
+  border-color: #3ea152;
+}
+
+.settings-version {
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
 .primary {
   background: #2a5ecf;
 }

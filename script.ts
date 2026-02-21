@@ -42,6 +42,7 @@ import {
   getSpecializationLabel,
   normalizeSpecialization,
 } from "./unit-specialization";
+import packageJson from "./package.json";
 
 interface InteractionState {
   activeMinerIndex: number | null;
@@ -102,6 +103,7 @@ interface UIElements {
   reset: HTMLButtonElement | null;
   openDevLog: HTMLButtonElement | null;
   checkForUpdates: HTMLButtonElement | null;
+  currentVersion: HTMLElement | null;
   devLogModal: HTMLElement | null;
   closeDevLogModalButton: HTMLButtonElement | null;
   devLogAccordion: HTMLElement | null;
@@ -331,7 +333,7 @@ interface InventoryRowRefs {
 }
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = getChangelogEntries();
-const APP_VERSION_ID = CHANGELOG_ENTRIES[0]?.releaseId ?? "0.0.0";
+const APP_VERSION_ID = CHANGELOG_ENTRIES[0]?.releaseId ?? packageJson.version ?? "0.0.0";
 const DEV_LOG_SEEN_VERSION_KEY = "numis-idle-dev-log-seen-version";
 
 const INVENTORY_ORES: InventoryOre[] = ["sand", "coal", "copper", "iron", "silver", "gold", "amethyst", "sapphire", "emerald", "ruby", "diamond"];
@@ -351,6 +353,7 @@ let repositionWorkerModalOpen = false;
 let serviceWorkerRegistration: ServiceWorkerRegistration | null = null;
 let hasCheckedForUpdatesOnFocusOpen = false;
 let updateReadyToReload = false;
+let updateCheckedUpToDate = false;
 let handledControllerChange = false;
 
 function markInventoryDirty(ore: InventoryOre): void {
@@ -507,6 +510,7 @@ const ui: UIElements = {
   reset: document.getElementById("reset") as HTMLButtonElement,
   openDevLog: document.getElementById("open-dev-log") as HTMLButtonElement,
   checkForUpdates: document.getElementById("check-for-updates") as HTMLButtonElement,
+  currentVersion: document.getElementById("current-version"),
   devLogModal: document.getElementById("dev-log-modal"),
   closeDevLogModalButton: document.getElementById("close-dev-log-modal") as HTMLButtonElement,
   devLogAccordion: document.getElementById("dev-log-accordion"),
@@ -967,7 +971,20 @@ function setUpdateButtonText(): void {
     return;
   }
 
-  ui.checkForUpdates.textContent = updateReadyToReload ? "Reload to Update" : "Check for Updates";
+  ui.checkForUpdates.textContent = updateReadyToReload ? "Update" : "Check for Updates";
+  ui.checkForUpdates.classList.toggle("update-ready", updateReadyToReload);
+}
+
+function setCurrentVersionText(): void {
+  if (!ui.currentVersion) {
+    return;
+  }
+
+  ui.currentVersion.textContent = updateReadyToReload
+    ? `Current Version: ${APP_VERSION_ID} • Update available`
+    : updateCheckedUpToDate
+    ? `Current Version: ${APP_VERSION_ID} • Up to Date`
+    : `Current Version: ${APP_VERSION_ID}`;
 }
 
 function activateWaitingUpdate(): void {
@@ -992,11 +1009,22 @@ function promptForUpdateReload(): void {
 
 function setUpdateReadyState(): void {
   updateReadyToReload = true;
+  updateCheckedUpToDate = false;
   setUpdateButtonText();
+  setCurrentVersionText();
 }
 
 function checkForUpdate(showStatusWhenUpToDate = false): void {
+  console.log("[updates] check started", {
+    showStatusWhenUpToDate,
+    hasRegistration: !!serviceWorkerRegistration,
+    updateReadyToReload,
+  });
+
   if (!serviceWorkerRegistration) {
+    updateCheckedUpToDate = false;
+    setCurrentVersionText();
+    console.log("[updates] check unavailable: no service worker registration");
     if (showStatusWhenUpToDate) {
       setStatus("Update check is unavailable.");
     }
@@ -1006,17 +1034,29 @@ function checkForUpdate(showStatusWhenUpToDate = false): void {
   serviceWorkerRegistration
     .update()
     .then(() => {
+      console.log("[updates] service worker update() completed", {
+        hasWaitingWorker: !!serviceWorkerRegistration?.waiting,
+      });
+
       if (serviceWorkerRegistration?.waiting) {
         setUpdateReadyState();
+        console.log("[updates] update available and waiting to activate");
         promptForUpdateReload();
         return;
       }
 
+      updateCheckedUpToDate = showStatusWhenUpToDate;
+      setCurrentVersionText();
+      console.log("[updates] app is on current version");
+
       if (showStatusWhenUpToDate) {
-        setStatus("You are already on the latest version.");
+        setStatus("Updated to current version.");
       }
     })
     .catch(() => {
+      updateCheckedUpToDate = false;
+      setCurrentVersionText();
+      console.log("[updates] check failed");
       if (showStatusWhenUpToDate) {
         setStatus("Unable to check for updates right now.");
       }
@@ -1024,7 +1064,7 @@ function checkForUpdate(showStatusWhenUpToDate = false): void {
 }
 
 function checkForUpdateOnceOnFocusOrOpen(): void {
-  if (hasCheckedForUpdatesOnFocusOpen) {
+  if (hasCheckedForUpdatesOnFocusOpen || !serviceWorkerRegistration) {
     return;
   }
 
@@ -1034,18 +1074,26 @@ function checkForUpdateOnceOnFocusOrOpen(): void {
 
 function monitorServiceWorkerRegistration(registration: ServiceWorkerRegistration): void {
   serviceWorkerRegistration = registration;
+  console.log("[updates] service worker registration ready", {
+    hasWaitingWorker: !!registration.waiting,
+  });
 
   if (registration.waiting) {
     setUpdateReadyState();
   }
 
   registration.addEventListener("updatefound", () => {
+    console.log("[updates] updatefound event fired");
     const installing = registration.installing;
     if (!installing) {
       return;
     }
 
     installing.addEventListener("statechange", () => {
+      console.log("[updates] installing state changed", {
+        state: installing.state,
+        hasController: !!navigator.serviceWorker.controller,
+      });
       if (installing.state === "installed" && navigator.serviceWorker.controller) {
         setUpdateReadyState();
         setStatus("A new update is ready.");
@@ -2833,6 +2881,7 @@ if (ui.checkForUpdates) {
 
 renderDevLogEntries();
 setUpdateButtonText();
+setCurrentVersionText();
 
 window.addEventListener("resize", handleViewportResize);
 window.addEventListener("orientationchange", handleViewportResize);
@@ -2889,7 +2938,7 @@ if (shouldRegisterServiceWorker) {
 
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("./sw.js")
+      .register(`./sw.js?v=${encodeURIComponent(APP_VERSION_ID)}`)
       .then((registration) => {
         monitorServiceWorkerRegistration(registration);
         if (document.visibilityState === "visible") {
