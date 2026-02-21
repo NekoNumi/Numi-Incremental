@@ -152,6 +152,7 @@ interface BindUiEventsArgs {
   saveGame: (showStatus?: boolean) => void;
   addCoinsCheat: () => void;
   resetGame: () => void;
+  setDevLogModalOpen: (isOpen: boolean) => void;
 }
 
 export function bindUiEvents(args: BindUiEventsArgs): void {
@@ -218,6 +219,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     saveGame,
     addCoinsCheat,
     resetGame,
+    setDevLogModalOpen,
   } = args;
 
   let placementDragActive = false;
@@ -423,6 +425,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
       setInventoryModalOpen(false);
       setUpgradesModalOpen(false);
       setWorkersModalOpen(false);
+      setDevLogModalOpen(false);
     }
   });
 

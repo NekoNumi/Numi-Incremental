@@ -2730,6 +2730,7 @@ bindUiEvents({
   saveGame,
   addCoinsCheat,
   resetGame,
+  setDevLogModalOpen,
 });
 
 if (ui.confirmRepositionButton) {
@@ -2822,12 +2823,6 @@ if (ui.devLogModal) {
     setDevLogModalOpen(false);
   });
 }
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    setDevLogModalOpen(false);
-  }
-});
 
 if (ui.checkForUpdates) {
   ui.checkForUpdates.addEventListener("click", () => {
