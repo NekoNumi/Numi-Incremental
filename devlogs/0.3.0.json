@@ -1,11 +1,11 @@
 {
-  "version": "Version 0.3",
-  "releaseId": "0.3.0",
+  "version": "Version 0.3.1",
+  "releaseId": "0.3.1",
   "notes": [
     "Added a development log screen with version entries.",
     "Added update detection with a reload prompt and one-time focus/open checks.",
     "Increased page button size and spacing for better mobile usability.",
     "Render per tile instead of per map for better performance and smoother updates.",
-    "locked header with inventory and map controls for easier access while scrolling."
+    "Locked header with inventory and map controls for easier access while scrolling."
   ]
 }
