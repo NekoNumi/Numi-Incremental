@@ -1,4 +1,6 @@
-const CACHE_NAME = "numis-idle-v0.3.0";
+const serviceWorkerUrl = new URL(self.location.href);
+const serviceWorkerVersion = serviceWorkerUrl.searchParams.get("v") || "0";
+const CACHE_NAME = `numis-idle-v${serviceWorkerVersion}`;
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("message", (event) => {

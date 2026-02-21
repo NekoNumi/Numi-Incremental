@@ -1,0 +1,8 @@
+{
+  "version": "Version 0.3.3",
+  "releaseId": "0.3.3",
+  "notes": [
+    "Implemented version number in settings",
+    "Version should now check to see if updates are available and offer reload if needed."
+  ]
+}
