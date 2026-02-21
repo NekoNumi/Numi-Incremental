@@ -23,6 +23,7 @@ interface ResourceLegendRowRefs {
 }
 
 const INVENTORY_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
+const UPGRADABLE_ORES: UpgradableOre[] = ["coal", "copper", "iron", "silver", "gold"];
 
 export function createResourceLogic(args: CreateResourceLogicArgs): {
   getResourceByOre: (ore: OreType) => ResourceConfig;
@@ -30,6 +31,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
   setOreGenerationLevel: (ore: UpgradableOre, level: number) => void;
   getOreWeightForLevel: (ore: OreType, level: number) => number;
   getOreGenerationCost: (ore: UpgradableOre) => number;
+  canIncreaseOreGeneration: (ore: UpgradableOre) => boolean;
   getOreEffectiveWeight: (ore: OreType) => number;
   rollTileType: () => OreType;
   rollTileTypeWithBoostedOre: (boostedOre: UpgradableOre, qualityMultiplier: number) => OreType;
@@ -175,19 +177,40 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     return level > 0 ? getResourceByOre(ore).weight : 0;
   }
 
-  function buildRedistributedWeightMap(): Record<OreType, number> {
+  function getLevelForOre(ore: OreType, overrides?: Partial<Record<UpgradableOre, number>>): number {
+    if (ore === "sand") {
+      return 0;
+    }
+
+    const overrideLevel = overrides?.[ore as UpgradableOre];
+    if (overrideLevel === undefined) {
+      return getOreGenerationLevel(ore as UpgradableOre);
+    }
+
+    return Math.max(0, overrideLevel);
+  }
+
+  function getUnlockedBaseWeightForLevel(ore: OreType, level: number): number {
+    if (ore === "sand") {
+      return getResourceByOre("sand").weight;
+    }
+
+    return level > 0 ? getResourceByOre(ore).weight : 0;
+  }
+
+  function buildRedistributedWeightMap(overrides?: Partial<Record<UpgradableOre, number>>): Record<OreType, number> {
     const redistributed: Record<OreType, number> = {
       sand: getUnlockedBaseWeight("sand"),
-      coal: getUnlockedBaseWeight("coal"),
-      copper: getUnlockedBaseWeight("copper"),
-      iron: getUnlockedBaseWeight("iron"),
-      silver: getUnlockedBaseWeight("silver"),
-      gold: getUnlockedBaseWeight("gold"),
+      coal: getUnlockedBaseWeightForLevel("coal", getLevelForOre("coal", overrides)),
+      copper: getUnlockedBaseWeightForLevel("copper", getLevelForOre("copper", overrides)),
+      iron: getUnlockedBaseWeightForLevel("iron", getLevelForOre("iron", overrides)),
+      silver: getUnlockedBaseWeightForLevel("silver", getLevelForOre("silver", overrides)),
+      gold: getUnlockedBaseWeightForLevel("gold", getLevelForOre("gold", overrides)),
     };
 
     for (let index = 1; index < INVENTORY_ORES.length; index += 1) {
       const ore = INVENTORY_ORES[index];
-      const level = getOreGenerationLevel(ore as UpgradableOre);
+      const level = getLevelForOre(ore, overrides);
       if (level <= 0) {
         redistributed[ore] = 0;
         continue;
@@ -224,6 +247,18 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
 
   function getOreGenerationCost(ore: UpgradableOre): number {
     return getUpgradeCost(getOreUpgradeConfig(ore), getOreGenerationLevel(ore));
+  }
+
+  function canIncreaseOreGeneration(ore: UpgradableOre): boolean {
+    const currentLevel = getOreGenerationLevel(ore);
+    const nextLevel = currentLevel + 1;
+    const nextWeight = getOreWeightForLevel(ore, nextLevel);
+    const maxSupportedWeight = buildRedistributedWeightMap({
+      ...Object.fromEntries(UPGRADABLE_ORES.map((entry) => [entry, getOreGenerationLevel(entry)])),
+      [ore]: Number.MAX_SAFE_INTEGER,
+    })[ore];
+
+    return nextWeight <= maxSupportedWeight;
   }
 
   function getOreEffectiveWeight(ore: OreType): number {
@@ -407,6 +442,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     setOreGenerationLevel,
     getOreWeightForLevel,
     getOreGenerationCost,
+    canIncreaseOreGeneration,
     getOreEffectiveWeight,
     rollTileType,
     rollTileTypeWithBoostedOre,

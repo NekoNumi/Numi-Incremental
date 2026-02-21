@@ -13,6 +13,7 @@ export function saveGameState(saveKey: string, state: GameState, storage: Storag
     saveKey,
     JSON.stringify({
       coins: state.coins,
+      activePlaySeconds: state.activePlaySeconds,
       autoSellEnabled: state.autoSellEnabled,
       idleMinerOwned: state.idleMinerOwned,
       idleMinerCooldowns: state.idleMinerCooldowns,
@@ -46,6 +47,7 @@ export function loadGameState(
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     state.coins = Number(parsed.coins) || 0;
+    state.activePlaySeconds = Math.max(0, Number(parsed.activePlaySeconds) || 0);
     state.autoSellEnabled = Boolean(parsed.autoSellEnabled);
     state.idleMinerOwned = Number(parsed.idleMinerOwned) || 0;
 

@@ -49,6 +49,7 @@ interface InteractionState {
 
 interface UIElements {
   coins: HTMLElement | null;
+  activePlayTime: HTMLElement | null;
   idleMinerCost: HTMLElement | null;
   idleMinerOwned: HTMLElement | null;
   settingsToggle: HTMLElement | null;
@@ -185,6 +186,7 @@ interface UIElements {
 // State
 const state: GameState = {
   coins: 0,
+  activePlaySeconds: 0,
   autoSellEnabled: false,
   idleMinerOwned: 0,
   mapExpansions: 0,
@@ -214,6 +216,7 @@ const interactionState: InteractionState = {
 
 let inventoryUiDirty = true;
 let lastRenderedCoinValue: number | null = null;
+let lastRenderedActivePlayWholeSeconds: number | null = null;
 
 type InventoryOre = OreType;
 
@@ -324,6 +327,7 @@ const enrichChanceUpgrade: UpgradeConfig = {
 // UI Element references
 const ui: UIElements = {
   coins: document.getElementById("coins"),
+  activePlayTime: document.getElementById("active-play-time"),
   idleMinerCost: document.getElementById("idle-miner-cost"),
   idleMinerOwned: document.getElementById("idle-miner-owned"),
   settingsToggle: document.getElementById("settings-toggle"),
@@ -484,6 +488,7 @@ const {
   getOreGenerationLevel,
   setOreGenerationLevel,
   getOreGenerationCost,
+  canIncreaseOreGeneration,
   rollTileType,
   rollTileTypeWithBoostedOre,
   getTileCoinValue,
@@ -629,6 +634,19 @@ function setMinerTargeting(mode: MinerTargeting): void {
 
 function format(value: number): string {
   return round(value, 1).toLocaleString();
+}
+
+function formatDuration(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600)
+    .toString()
+    .padStart(2, "0");
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (safeSeconds % 60).toString().padStart(2, "0");
+
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function setStatus(message: string): void {
@@ -952,6 +970,7 @@ const {
   getIdleMinerCost,
   getMapExpansionCost,
   getOreGenerationCost,
+  canIncreaseOreGeneration,
   getOreGenerationLevel,
   setOreGenerationLevel,
   syncIdleMinerState,
@@ -993,7 +1012,6 @@ function renderMinerRing(): void {
   }
 
   for (let index = 0; index < state.idleMinerOwned; index += 1) {
-    const cooldownLeft = Math.max(0, state.idleMinerCooldowns[index] ?? 0);
     const { x, y } = getMinerPosition(index);
 
     const minerNode = document.createElement("div");
@@ -1005,7 +1023,7 @@ function renderMinerRing(): void {
     minerNode.style.setProperty("--miner-radius", `${getMinerEffectRadiusPx(index)}px`);
     minerNode.style.left = `calc(50% + ${x}px)`;
     minerNode.style.top = `calc(50% + ${y}px)`;
-    minerNode.innerHTML = `<strong>${getMinerRingLabel(index)}</strong>${cooldownLeft.toFixed(1)}s`;
+    minerNode.innerHTML = `<strong>${getMinerRingLabel(index)}</strong>`;
     ui.minerRing.appendChild(minerNode);
   }
 }
@@ -1290,6 +1308,11 @@ function renderNow(): void {
   const ironCost = getOreGenerationCost("iron");
   const silverCost = getOreGenerationCost("silver");
   const goldCost = getOreGenerationCost("gold");
+  const canUpgradeCoalGeneration = canIncreaseOreGeneration("coal");
+  const canUpgradeCopperGeneration = canIncreaseOreGeneration("copper");
+  const canUpgradeIronGeneration = canIncreaseOreGeneration("iron");
+  const canUpgradeSilverGeneration = canIncreaseOreGeneration("silver");
+  const canUpgradeGoldGeneration = canIncreaseOreGeneration("gold");
   const totalInventory =
     getInventoryAmount("sand") +
     getInventoryAmount("coal") +
@@ -1316,6 +1339,11 @@ function renderNow(): void {
     ui.coins.textContent = format(state.coins);
     lastRenderedCoinValue = state.coins;
   }
+  const activePlayWholeSeconds = Math.floor(state.activePlaySeconds);
+  if (ui.activePlayTime && lastRenderedActivePlayWholeSeconds !== activePlayWholeSeconds) {
+    ui.activePlayTime.textContent = formatDuration(activePlayWholeSeconds);
+    lastRenderedActivePlayWholeSeconds = activePlayWholeSeconds;
+  }
   if (ui.idleMinerCost) ui.idleMinerCost.textContent = idleMinerCost.toLocaleString();
   if (ui.idleMinerOwned) ui.idleMinerOwned.textContent = state.idleMinerOwned.toString();
   if (ui.buyIdleMiner) ui.buyIdleMiner.disabled = !canAfford(idleMinerCost);
@@ -1326,27 +1354,44 @@ function renderNow(): void {
   if (ui.coalGenerationCost) ui.coalGenerationCost.textContent = coalCost.toLocaleString();
   if (ui.coalGenerationLevel) ui.coalGenerationLevel.textContent = getOreGenerationLevel("coal").toString();
   if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getOreGenerationStatText("coal");
-  if (ui.buyCoalGeneration) ui.buyCoalGeneration.disabled = !canAfford(coalCost);
-  if (ui.buyCopperGeneration) ui.buyCopperGeneration.classList.toggle("hidden", !interactionState.oreCopperRevealed && getOreGenerationLevel("copper") === 0);
+  if (ui.buyCoalGeneration) {
+    ui.buyCoalGeneration.classList.toggle("hidden", !canUpgradeCoalGeneration);
+    ui.buyCoalGeneration.disabled = !canAfford(coalCost) || !canUpgradeCoalGeneration;
+  }
+  if (ui.buyCopperGeneration) {
+    ui.buyCopperGeneration.classList.toggle(
+      "hidden",
+      (!interactionState.oreCopperRevealed && getOreGenerationLevel("copper") === 0) || !canUpgradeCopperGeneration
+    );
+  }
   if (ui.copperGenerationCost) ui.copperGenerationCost.textContent = copperCost.toLocaleString();
   if (ui.copperGenerationLevel) ui.copperGenerationLevel.textContent = getOreGenerationLevel("copper").toString();
   if (ui.copperGenerationStat) ui.copperGenerationStat.textContent = getOreGenerationStatText("copper");
-  if (ui.buyCopperGeneration) ui.buyCopperGeneration.disabled = !canAfford(copperCost);
-  if (ui.buyIronGeneration) ui.buyIronGeneration.classList.toggle("hidden", !interactionState.oreIronRevealed && getOreGenerationLevel("iron") === 0);
+  if (ui.buyCopperGeneration) ui.buyCopperGeneration.disabled = !canAfford(copperCost) || !canUpgradeCopperGeneration;
+  if (ui.buyIronGeneration) {
+    ui.buyIronGeneration.classList.toggle("hidden", (!interactionState.oreIronRevealed && getOreGenerationLevel("iron") === 0) || !canUpgradeIronGeneration);
+  }
   if (ui.ironGenerationCost) ui.ironGenerationCost.textContent = ironCost.toLocaleString();
   if (ui.ironGenerationLevel) ui.ironGenerationLevel.textContent = getOreGenerationLevel("iron").toString();
   if (ui.ironGenerationStat) ui.ironGenerationStat.textContent = getOreGenerationStatText("iron");
-  if (ui.buyIronGeneration) ui.buyIronGeneration.disabled = !canAfford(ironCost);
-  if (ui.buySilverGeneration) ui.buySilverGeneration.classList.toggle("hidden", !interactionState.oreSilverRevealed && getOreGenerationLevel("silver") === 0);
+  if (ui.buyIronGeneration) ui.buyIronGeneration.disabled = !canAfford(ironCost) || !canUpgradeIronGeneration;
+  if (ui.buySilverGeneration) {
+    ui.buySilverGeneration.classList.toggle(
+      "hidden",
+      (!interactionState.oreSilverRevealed && getOreGenerationLevel("silver") === 0) || !canUpgradeSilverGeneration
+    );
+  }
   if (ui.silverGenerationCost) ui.silverGenerationCost.textContent = silverCost.toLocaleString();
   if (ui.silverGenerationLevel) ui.silverGenerationLevel.textContent = getOreGenerationLevel("silver").toString();
   if (ui.silverGenerationStat) ui.silverGenerationStat.textContent = getOreGenerationStatText("silver");
-  if (ui.buySilverGeneration) ui.buySilverGeneration.disabled = !canAfford(silverCost);
-  if (ui.buyGoldGeneration) ui.buyGoldGeneration.classList.toggle("hidden", !interactionState.oreGoldRevealed && getOreGenerationLevel("gold") === 0);
+  if (ui.buySilverGeneration) ui.buySilverGeneration.disabled = !canAfford(silverCost) || !canUpgradeSilverGeneration;
+  if (ui.buyGoldGeneration) {
+    ui.buyGoldGeneration.classList.toggle("hidden", (!interactionState.oreGoldRevealed && getOreGenerationLevel("gold") === 0) || !canUpgradeGoldGeneration);
+  }
   if (ui.goldGenerationCost) ui.goldGenerationCost.textContent = goldCost.toLocaleString();
   if (ui.goldGenerationLevel) ui.goldGenerationLevel.textContent = getOreGenerationLevel("gold").toString();
   if (ui.goldGenerationStat) ui.goldGenerationStat.textContent = getOreGenerationStatText("gold");
-  if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost);
+  if (ui.buyGoldGeneration) ui.buyGoldGeneration.disabled = !canAfford(goldCost) || !canUpgradeGoldGeneration;
   if (ui.sellAllResources) ui.sellAllResources.disabled = totalInventory <= 0;
   renderInventoryAutoSellToggle();
 
@@ -1371,6 +1416,12 @@ function gameLoop(): void {
   const now = Date.now();
   const deltaSeconds = (now - state.lastTick) / 1000;
   state.lastTick = now;
+
+  const isActiveSession = document.visibilityState === "visible" && document.hasFocus();
+  if (isActiveSession && Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
+    state.activePlaySeconds += Math.min(deltaSeconds, 1);
+  }
+
   runIdleMiners(deltaSeconds);
   render();
 }

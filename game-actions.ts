@@ -10,6 +10,7 @@ interface CreateGameActionsArgs {
   getIdleMinerCost: () => number;
   getMapExpansionCost: () => number;
   getOreGenerationCost: (ore: UpgradableOre) => number;
+  canIncreaseOreGeneration: (ore: UpgradableOre) => boolean;
   getOreGenerationLevel: (ore: UpgradableOre) => number;
   setOreGenerationLevel: (ore: UpgradableOre, level: number) => void;
   syncIdleMinerState: () => void;
@@ -39,6 +40,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
     getIdleMinerCost,
     getMapExpansionCost,
     getOreGenerationCost,
+    canIncreaseOreGeneration,
     getOreGenerationLevel,
     setOreGenerationLevel,
     syncIdleMinerState,
@@ -62,6 +64,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
   function resetGame(): void {
     clearSavedGame(saveKey);
     state.coins = 0;
+    state.activePlaySeconds = 0;
     state.autoSellEnabled = false;
     state.idleMinerOwned = 0;
     state.mapExpansions = 0;
@@ -89,6 +92,10 @@ export function createGameActions(args: CreateGameActionsArgs): {
   }
 
   function buyOreGeneration(ore: UpgradableOre): void {
+    if (!canIncreaseOreGeneration(ore)) {
+      return;
+    }
+
     const cost = getOreGenerationCost(ore);
     if (!canAfford(cost)) {
       return;

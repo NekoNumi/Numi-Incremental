@@ -57,6 +57,7 @@ export type ResourceInventory = Record<OreType, number>;
 
 export interface GameState {
   coins: number;
+  activePlaySeconds: number;
   autoSellEnabled: boolean;
   idleMinerOwned: number;
   mapExpansions: number;
