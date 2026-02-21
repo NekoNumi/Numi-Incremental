@@ -290,7 +290,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Prospector" ? data.veinFinderLevel : 0;
     const currentBoost = (getVeinFinderQualityMultiplier(minerIndex) - 1) * 100;
-    const nextBoost = (1 + (level + 1) * 0.25 - 1) * 100;
+    const nextBoost = (1.25 + (level + 1) * 0.25 - 1) * 100;
     return `Current boost: +${currentBoost.toFixed(0)}% → Upgrading to: +${nextBoost.toFixed(0)}% for mined ore respawn weight`;
   }
 
