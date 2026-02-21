@@ -1299,7 +1299,7 @@ button:disabled {
   }
 
   .app {
-    padding-bottom: calc(4.4rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5.8rem + env(safe-area-inset-bottom));
   }
 
   .mobile-footer {
@@ -1311,15 +1311,22 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.45rem;
-    padding: 0.55rem;
-    padding-bottom: calc(0.55rem + env(safe-area-inset-bottom));
+    padding: 0.7rem;
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
     background: #1b2233;
     border-top: 1px solid #2b3550;
   }
 
   .mobile-footer-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     min-width: 0;
+    min-height: 3.25rem;
+    padding: 0.9rem 1.15rem;
+    font-size: 0.9rem;
+    text-align: center;
   }
 
   .mobile-footer.mobile-footer-left-handed {
