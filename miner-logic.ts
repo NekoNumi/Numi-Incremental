@@ -24,7 +24,7 @@ interface CreateMinerLogicArgs {
   buildSpecializationData: typeof buildSpecializationData;
   getSpecializationLabel: typeof getSpecializationLabel;
   minTileCoverageInRadius: number;
-  baseMinerEffectRadiusPx: number;
+  getBaseMinerEffectRadiusPx: () => number;
   idleMinerTriggerIntervalSeconds: number;
   fasterMinerBonusClicksPerSecond: number;
   minerRadiusBonusPerLevel: number;
@@ -132,7 +132,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     buildSpecializationData,
     getSpecializationLabel,
     minTileCoverageInRadius,
-    baseMinerEffectRadiusPx,
+    getBaseMinerEffectRadiusPx,
     idleMinerTriggerIntervalSeconds,
     fasterMinerBonusClicksPerSecond,
     minerRadiusBonusPerLevel,
@@ -315,7 +315,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function getMinerEffectRadiusPx(minerIndex: number): number {
     const upgrade = getMinerUpgrade(minerIndex);
-    const baseRadius = baseMinerEffectRadiusPx * (1 + upgrade.radiusLevel * minerRadiusBonusPerLevel);
+    const baseRadius = getBaseMinerEffectRadiusPx() * (1 + upgrade.radiusLevel * minerRadiusBonusPerLevel);
     const aura = getForemanAuraForMiner(minerIndex);
     return baseRadius * aura.rangeMultiplier;
   }
@@ -518,7 +518,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
       return `Current Autonomy: +${current}% worker range → Upgrading to: +${next}%`;
     }
     const currentRadius = Math.round(getMinerEffectRadiusPx(minerIndex));
-    const nextRadius = Math.round(baseMinerEffectRadiusPx * (1 + (upgrade.radiusLevel + 1) * minerRadiusBonusPerLevel));
+    const nextRadius = Math.round(getBaseMinerEffectRadiusPx() * (1 + (upgrade.radiusLevel + 1) * minerRadiusBonusPerLevel));
     return `Current: ${currentRadius}px radius → Upgrading to: ${nextRadius}px radius`;
   }
 

@@ -69,6 +69,7 @@ export interface GameState {
   coins: number;
   activePlaySeconds: number;
   autoSellEnabled: boolean;
+  leftHandedMode: boolean;
   idleMinerOwned: number;
   mapExpansions: number;
   resources: ResourceConfig[];

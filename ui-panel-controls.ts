@@ -1,6 +1,7 @@
 interface UiPanelControlsRefs {
   settingsModal: HTMLElement | null;
   settingsToggle: HTMLElement | null;
+  settingsToggleMobile: HTMLElement | null;
   classModal: HTMLElement | null;
   minerPopup: HTMLElement | null;
   minerStatsPanel: HTMLElement | null;
@@ -47,10 +48,15 @@ export function createUiPanelControls(args: CreateUiPanelControlsArgs): {
   } = args;
 
   function setSettingsModalOpen(isOpen: boolean): void {
-    if (!ui.settingsModal || !ui.settingsToggle) return;
+    if (!ui.settingsModal) return;
     ui.settingsModal.classList.toggle("hidden", !isOpen);
     ui.settingsModal.setAttribute("aria-hidden", String(!isOpen));
-    ui.settingsToggle.setAttribute("aria-expanded", String(isOpen));
+    if (ui.settingsToggle) {
+      ui.settingsToggle.setAttribute("aria-expanded", String(isOpen));
+    }
+    if (ui.settingsToggleMobile) {
+      ui.settingsToggleMobile.setAttribute("aria-expanded", String(isOpen));
+    }
   }
 
   function setClassModalOpen(isOpen: boolean): void {

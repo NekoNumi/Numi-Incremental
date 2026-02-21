@@ -15,6 +15,7 @@ interface InventoryItemState {
 }
 
 interface ResourceLegendRowRefs {
+  row: HTMLElement;
   name: HTMLElement;
   nameLabel: HTMLElement;
   chance: HTMLElement;
@@ -27,6 +28,9 @@ const INVENTORY_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "
 const NORMAL_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold"];
 const UPGRADABLE_ORES: UpgradableOre[] = INVENTORY_ORES.slice(1) as UpgradableOre[];
 const GEM_ORES: UpgradableOre[] = ["amethyst", "sapphire", "emerald", "ruby", "diamond"];
+const STONE_ORES: OreType[] = ["sand", "coal"];
+const METAL_ORES: OreType[] = ["copper", "iron", "silver", "gold"];
+type ResourceCategoryKey = "stone" | "metal" | "gemstone";
 
 export function createResourceLogic(args: CreateResourceLogicArgs): {
   getResourceByOre: (ore: OreType) => ResourceConfig;
@@ -56,7 +60,42 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
 
   const legendDirtyOres = new Set<OreType>(INVENTORY_ORES);
   const legendRowRefs: Partial<Record<OreType, ResourceLegendRowRefs>> = {};
-  let gemstoneSummaryRefs: ResourceLegendRowRefs | null = null;
+  const categorySummaryRefs: Partial<Record<ResourceCategoryKey, ResourceLegendRowRefs>> = {};
+  const categorySectionRows: Partial<Record<ResourceCategoryKey, HTMLElement>> = {};
+  const categorySplitOpen: Record<ResourceCategoryKey, boolean> = {
+    stone: false,
+    metal: false,
+    gemstone: false,
+  };
+  const categoryDefinitions: Array<{ key: ResourceCategoryKey; label: string; ores: OreType[] }> = [
+    { key: "stone", label: "Stone", ores: STONE_ORES },
+    { key: "metal", label: "Metal", ores: METAL_ORES },
+    { key: "gemstone", label: "Gemstone", ores: [...GEM_ORES] },
+  ];
+
+  function updateCategorySplitVisibility(): void {
+    for (const category of categoryDefinitions) {
+      const isOpen = categorySplitOpen[category.key];
+      const sectionRow = categorySectionRows[category.key];
+      if (sectionRow) {
+        sectionRow.classList.toggle("hidden", !isOpen);
+      }
+
+      for (const ore of category.ores) {
+        const refs = legendRowRefs[ore];
+        if (refs) {
+          refs.row.classList.toggle("hidden", !isOpen);
+        }
+      }
+
+      const summaryRefs = categorySummaryRefs[category.key];
+      if (summaryRefs) {
+        summaryRefs.sellButton.textContent = isOpen ? "Split ▾" : "Split ▸";
+        summaryRefs.sellButton.setAttribute("aria-expanded", String(isOpen));
+        summaryRefs.sellButton.setAttribute("aria-label", isOpen ? `Collapse ${category.label.toLowerCase()} split` : `Expand ${category.label.toLowerCase()} split`);
+      }
+    }
+  }
 
   function markLegendDirty(ore: OreType): void {
     legendDirtyOres.add(ore);
@@ -396,7 +435,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     if (!legendInitialized) {
       resourceLegendBody.innerHTML = "";
 
-      const createLegendRow = (ore: OreType | "gemstone", sellable: boolean): ResourceLegendRowRefs => {
+      const createLegendRow = (ore: OreType | ResourceCategoryKey, mode: "sell" | "accordion" | "none"): ResourceLegendRowRefs => {
         const row = document.createElement("p");
         row.className = "resource-legend-row";
 
@@ -413,7 +452,11 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
         nameLabel.className = "resource-legend-name-label";
         tilePreview.className = "resource-legend-tile map-tile";
         if (ore === "gemstone") {
-          tilePreview.classList.add("resource-legend-tile--gemstone");
+          tilePreview.classList.add("resource-legend-tile--gemstone", "map-tile--diamond");
+        } else if (ore === "stone") {
+          tilePreview.classList.add("map-tile--coal");
+        } else if (ore === "metal") {
+          tilePreview.classList.add("map-tile--iron");
         } else if (ore !== "sand") {
           tilePreview.classList.add(`map-tile--${ore}`);
         }
@@ -422,9 +465,12 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
 
         sellButton.type = "button";
         sellButton.className = "resource-sell-btn";
-        if (sellable) {
+        if (mode === "sell") {
           sellButton.dataset.ore = ore;
-          sellButton.textContent = "Sell 1";
+          sellButton.textContent = "Sell All";
+        } else if (mode === "accordion") {
+          sellButton.classList.add("resource-accordion-btn");
+          sellButton.textContent = "Split ▸";
         } else {
           sellButton.disabled = true;
           sellButton.textContent = "-";
@@ -435,6 +481,7 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
         resourceLegendBody.appendChild(row);
 
         return {
+          row,
           name: nameNode,
           nameLabel,
           chance: chanceNode,
@@ -444,22 +491,29 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
         };
       };
 
-      for (const ore of NORMAL_ORES) {
-        legendRowRefs[ore] = createLegendRow(ore, true);
+      for (const category of categoryDefinitions) {
+        const summaryRefs = createLegendRow(category.key, "accordion");
+        categorySummaryRefs[category.key] = summaryRefs;
+        summaryRefs.sellButton.addEventListener("click", () => {
+          categorySplitOpen[category.key] = !categorySplitOpen[category.key];
+          updateCategorySplitVisibility();
+        });
       }
 
-      gemstoneSummaryRefs = createLegendRow("gemstone", false);
+      for (const category of categoryDefinitions) {
+        const sectionRow = document.createElement("p");
+        sectionRow.className = "resource-legend-section-row";
+        sectionRow.textContent = `${category.label} Split`;
+        resourceLegendBody.appendChild(sectionRow);
+        categorySectionRows[category.key] = sectionRow;
 
-      const gemstoneSectionRow = document.createElement("p");
-      gemstoneSectionRow.className = "resource-legend-section-row";
-      gemstoneSectionRow.textContent = "Gemstone Split";
-      resourceLegendBody.appendChild(gemstoneSectionRow);
-
-      for (const ore of GEM_ORES) {
-        legendRowRefs[ore] = createLegendRow(ore, true);
+        for (const ore of category.ores) {
+          legendRowRefs[ore] = createLegendRow(ore, "sell");
+        }
       }
 
       legendInitialized = true;
+      updateCategorySplitVisibility();
       markAllLegendDirty();
     }
 
@@ -470,47 +524,34 @@ export function createResourceLogic(args: CreateResourceLogicArgs): {
     const effectiveWeights = buildEffectiveWeightMap();
     const weights = INVENTORY_ORES.map((ore) => ({ ore, weight: effectiveWeights[ore] || 0 }));
     const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
-    const gemstoneWeight = GEM_ORES.reduce((sum, ore) => sum + (effectiveWeights[ore] || 0), 0);
+    for (const category of categoryDefinitions) {
+      const categoryWeight = category.ores.reduce((sum, ore) => sum + (effectiveWeights[ore] || 0), 0);
+      const categoryChancePercent = totalWeight > 0 ? (categoryWeight / totalWeight) * 100 : 0;
+      const categoryInventory = category.ores.reduce((sum, ore) => sum + getInventoryAmount(ore), 0);
 
-    for (const ore of NORMAL_ORES) {
-      const refs = legendRowRefs[ore];
-      if (!refs) {
-        continue;
+      const summaryRefs = categorySummaryRefs[category.key];
+      if (summaryRefs) {
+        summaryRefs.nameLabel.textContent = category.label;
+        summaryRefs.chance.textContent = `${getChanceText(categoryChancePercent)}%`;
+        summaryRefs.value.textContent = "-";
+        summaryRefs.inventory.textContent = categoryInventory.toLocaleString();
       }
 
-      const weight = weights.find((entry) => entry.ore === ore)?.weight || 0;
-      const chancePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0;
+      for (const ore of category.ores) {
+        const refs = legendRowRefs[ore];
+        if (!refs) {
+          continue;
+        }
 
-      refs.nameLabel.textContent = getOreDisplayName(ore);
-      refs.chance.textContent = `${getChanceText(chancePercent)}%`;
-      refs.value.textContent = getTileCoinValue(ore).toString();
-      refs.inventory.textContent = getInventoryAmount(ore).toString();
-      refs.sellButton.dataset.ore = ore;
-    }
+        const weight = weights.find((entry) => entry.ore === ore)?.weight || 0;
+        const chancePercent = categoryWeight > 0 ? (weight / categoryWeight) * 100 : 0;
 
-    if (gemstoneSummaryRefs) {
-      const gemstoneChancePercent = totalWeight > 0 ? (gemstoneWeight / totalWeight) * 100 : 0;
-      const gemstoneInventory = GEM_ORES.reduce((sum, ore) => sum + getInventoryAmount(ore), 0);
-      gemstoneSummaryRefs.nameLabel.textContent = "Gemstone";
-      gemstoneSummaryRefs.chance.textContent = `${getChanceText(gemstoneChancePercent)}%`;
-      gemstoneSummaryRefs.value.textContent = "-";
-      gemstoneSummaryRefs.inventory.textContent = gemstoneInventory.toLocaleString();
-    }
-
-    for (const ore of GEM_ORES) {
-      const refs = legendRowRefs[ore];
-      if (!refs) {
-        continue;
+        refs.nameLabel.textContent = getOreDisplayName(ore);
+        refs.chance.textContent = `${getChanceText(chancePercent)}%`;
+        refs.value.textContent = getTileCoinValue(ore).toString();
+        refs.inventory.textContent = getInventoryAmount(ore).toString();
+        refs.sellButton.dataset.ore = ore;
       }
-
-      const weight = weights.find((entry) => entry.ore === ore)?.weight || 0;
-      const chancePercent = gemstoneWeight > 0 ? (weight / gemstoneWeight) * 100 : 0;
-
-      refs.nameLabel.textContent = getOreDisplayName(ore);
-      refs.chance.textContent = `${getChanceText(chancePercent)}%`;
-      refs.value.textContent = getTileCoinValue(ore).toString();
-      refs.inventory.textContent = getInventoryAmount(ore).toString();
-      refs.sellButton.dataset.ore = ore;
     }
 
     legendDirtyOres.clear();

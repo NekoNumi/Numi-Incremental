@@ -7,12 +7,10 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <button id="settings-toggle" class="icon-button settings-cog" aria-label="Open settings" aria-expanded="false">⚙</button>
-
     <main class="app">
       <header class="topbar">
-        <h1>Numi's Idle</h1>
         <section class="panel stats" aria-label="Stats">
+          <button id="settings-toggle" class="icon-button settings-cog" aria-label="Open settings" aria-expanded="false">⚙</button>
           <div>
             <span class="label">Coins</span>
             <strong id="coins">0</strong>
@@ -21,57 +19,354 @@
             <span class="label">Active Time</span>
             <strong id="active-play-time">00:00:00</strong>
           </div>
-          <button id="inventory-toggle" class="inventory-toggle-button">Inventory</button>
+          <div class="topbar-actions">
+            <button id="inventory-toggle" class="topbar-action-button">Inventory</button>
+            <button id="upgrades-toggle" class="topbar-action-button">Upgrades</button>
+          </div>
         </section>
       </header>
 
       <section class="content-layout">
         <section class="panel map" aria-label="Map">
-          <button id="resource-stats-toggle" class="icon-button map-info-toggle" aria-label="Open resource stats" aria-expanded="false">ⓘ</button>
-          <section id="resource-stats-panel" class="panel left-side-menu resource-stats-panel hidden" aria-label="Resource stats">
-            <div class="miner-popup-header">
-              <h3>Resource Stats</h3>
-              <div class="resource-stats-actions">
-                <button id="sell-all-resources" class="resource-sell-all">Sell All</button>
-                <button id="close-resource-stats" class="close-button" aria-label="Close resource stats">✕</button>
+          <div id="miner-stats-host">
+            <section id="miner-stats-panel" class="panel left-side-menu miner-stats-panel hidden" aria-label="Miner stats">
+              <div class="miner-popup-header">
+                <h3 id="miner-stats-title">Miner Stats</h3>
+                <button id="close-miner-stats" class="close-button" aria-label="Close miner stats">✕</button>
               </div>
-            </div>
-            <div class="resource-legend-header">
-              <span>Resource</span>
-              <span>Chance</span>
-              <span>Value</span>
-              <span>Inv</span>
-              <span>Sell</span>
-            </div>
-            <div id="resource-legend-body" class="resource-legend-body"></div>
-          </section>
-          <section id="miner-stats-panel" class="panel left-side-menu miner-stats-panel hidden" aria-label="Miner stats">
-            <div class="miner-popup-header">
-              <h3 id="miner-stats-title">Miner Stats</h3>
-              <button id="close-miner-stats" class="close-button" aria-label="Close miner stats">✕</button>
-            </div>
-            <p class="miner-stat-row"><span>Position</span><strong id="stats-miner-position">0, 0</strong></p>
-            <p class="miner-stat-row"><span>Rate</span><strong id="stats-miner-rate">0.00 act/sec</strong></p>
-            <p class="miner-stat-row"><span>Cooldown</span><strong id="stats-miner-cooldown">0.00s</strong></p>
-            <p class="miner-stat-row"><span>Radius</span><strong id="stats-miner-radius">0px</strong></p>
-            <p class="miner-stat-row"><span>Speed Lvl</span><strong id="stats-miner-speed-level">0</strong></p>
-            <p class="miner-stat-row"><span>Radius Lvl</span><strong id="stats-miner-radius-level">0</strong></p>
-            <p class="miner-stat-row"><span>DA Range</span><strong id="stats-double-activation-range">0%-0%</strong></p>
-          </section>
-          <h2>Map</h2>
-          <p class="map-meta">Size: <strong id="map-size">1x1</strong></p>
+              <p class="miner-stat-row"><span>Position</span><strong id="stats-miner-position">0, 0</strong></p>
+              <p class="miner-stat-row"><span>Rate</span><strong id="stats-miner-rate">0.00 act/sec</strong></p>
+              <p class="miner-stat-row"><span>Radius</span><strong id="stats-miner-radius">0px</strong></p>
+              <div id="stats-class-details" class="miner-stat-details"></div>
+            </section>
+          </div>
           <div id="map-environment" class="map-environment">
             <div id="miner-ring" class="miner-ring" aria-label="Idle miners"></div>
             <div id="map-grid" class="map-grid" role="button" aria-label="Sandy map, click tiles to gather coins"></div>
           </div>
+          <section id="mobile-reposition-controls" class="mobile-reposition-controls hidden" aria-label="Reposition controls">
+            <p id="mobile-reposition-prompt" class="mobile-reposition-prompt" aria-live="polite"></p>
+            <div class="mobile-reposition-worker-nav">
+              <button id="reposition-prev-worker">Previous</button>
+              <button id="reposition-select-worker">Select Worker</button>
+              <button id="reposition-next-worker">Next</button>
+            </div>
+            <div class="mobile-reposition-actions">
+              <button id="confirm-reposition">Confirm</button>
+              <button id="cancel-reposition" class="danger">Cancel</button>
+            </div>
+          </section>
+          <section id="reposition-worker-modal" class="modal hidden" aria-label="Select reposition worker" aria-hidden="true">
+            <div class="modal-backdrop"></div>
+            <div class="panel modal-card reposition-worker-modal-card">
+              <header class="modal-header">
+                <h2>Select Worker</h2>
+                <div class="modal-actions">
+                  <button id="close-reposition-worker-modal">Close</button>
+                </div>
+              </header>
+              <div class="modal-body">
+                <div id="reposition-worker-modal-list" class="reposition-worker-picker" aria-label="Reposition worker list"></div>
+              </div>
+            </div>
+          </section>
+          <div id="miner-popup-host">
+            <section id="miner-popup" class="miner-popup hidden" aria-label="Miner options">
+              <div class="miner-popup-header">
+                <h3 id="miner-popup-title">Miner</h3>
+                <button id="close-miner-popup" class="close-button" aria-label="Close miner panel">✕</button>
+              </div>
+              <button id="popup-choose-class" class="hidden">Choose Class</button>
+              <div class="upgrade">
+                <div class="upgrade-header">
+                  <span>Targeting</span>
+                  <strong class="upgrade-quantity">Mode</strong>
+                </div>
+                <div class="upgrade-header">
+                  <button id="popup-targeting-random">Random</button>
+                  <button id="popup-targeting-high">High Quality</button>
+                  <button id="popup-targeting-low">Low Quality</button>
+                </div>
+              </div>
+              <button id="popup-upgrade-speed" class="upgrade">
+                <div class="upgrade-header">
+                  <span id="popup-speed-label">Faster Miner</span>
+                  <strong class="upgrade-quantity" id="popup-speed-level">0</strong>
+                </div>
+                <small id="popup-speed-stat">Current: 0.20 act/sec → Upgrading to: 0.30 act/sec</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-speed-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-radius" class="upgrade">
+                <div class="upgrade-header">
+                  <span id="popup-radius-label">Wider Mining Radius</span>
+                  <strong class="upgrade-quantity" id="popup-radius-level">0</strong>
+                </div>
+                <small id="popup-radius-stat">Current: 90px radius → Upgrading to: 113px radius</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-radius-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-overtime" class="upgrade">
+                <div class="upgrade-header">
+                  <span>Overtime</span>
+                  <strong class="upgrade-quantity" id="popup-overtime-level">0</strong>
+                </div>
+                <small id="popup-overtime-stat">Current aura bonus: +0% → Upgrading to: +3%</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-overtime-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-double-activation-min" class="upgrade">
+                <div class="upgrade-header">
+                  <span>⏩ Multi Activation (Min)</span>
+                  <strong class="upgrade-quantity" id="popup-double-activation-min-level">0</strong>
+                </div>
+                <small id="popup-double-activation-min-stat">Current min: 0% → Upgrading to: 10%</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-double-activation-min-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-double-activation-max" class="upgrade">
+                <div class="upgrade-header">
+                  <span>⏩ Multi Activation (Max)</span>
+                  <strong class="upgrade-quantity" id="popup-double-activation-max-level">0</strong>
+                </div>
+                <small id="popup-double-activation-max-stat">Current max: 0% → Upgrading to: 20%</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-double-activation-max-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-vein-finder" class="upgrade">
+                <div class="upgrade-header">
+                  <span>🧭 Prospector</span>
+                  <strong class="upgrade-quantity" id="popup-vein-finder-level">0</strong>
+                </div>
+                <small id="popup-vein-finder-stat">Current boost: +0% → Upgrading to: +25% for mined ore respawn weight</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-vein-finder-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-crit-chance" class="upgrade">
+                <div class="upgrade-header">
+                  <span>🎯 Crit Build (Chance)</span>
+                  <strong class="upgrade-quantity" id="popup-crit-chance-level">0</strong>
+                </div>
+                <small id="popup-crit-chance-stat">Current chance: 0% → Upgrading to: 3%</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-crit-chance-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-crit-multiplier" class="upgrade">
+                <div class="upgrade-header">
+                  <span>🎯 Crit Build (Multiplier)</span>
+                  <strong class="upgrade-quantity" id="popup-crit-multiplier-level">0</strong>
+                </div>
+                <small id="popup-crit-multiplier-stat">Current crit: 2.0x → Upgrading to: 2.2x</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-crit-multiplier-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-chain-reaction" class="upgrade">
+                <div class="upgrade-header">
+                  <span>Chain Lightning</span>
+                  <strong class="upgrade-quantity" id="popup-chain-reaction-level">0</strong>
+                </div>
+                <small id="popup-chain-reaction-stat">Locked. 0% chance → Unlocks 1 adjacent chain</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-chain-reaction-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-metal-bias" class="upgrade">
+                <div class="upgrade-header">
+                  <span>Metal Bias</span>
+                  <strong class="upgrade-quantity" id="popup-metal-bias-level">0</strong>
+                </div>
+                <small id="popup-metal-bias-stat">Current metal bias: 0% → Upgrading to: 5%</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-metal-bias-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-electric-efficiency" class="upgrade">
+                <div class="upgrade-header">
+                  <span>Electric Efficiency</span>
+                  <strong class="upgrade-quantity" id="popup-electric-efficiency-level">0</strong>
+                </div>
+                <small id="popup-electric-efficiency-stat">Current extension chance: 0% → Upgrading to: 5% on metal chain</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-electric-efficiency-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-enchant-bountiful" class="upgrade">
+                <div class="upgrade-header">
+                  <span>✨ Enchant Bountiful</span>
+                  <strong class="upgrade-quantity" id="popup-enchant-bountiful-level">0</strong>
+                </div>
+                <small id="popup-enchant-bountiful-stat">Current chance: 0% → Upgrading to: 15% to apply Bountiful enchantment</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-enchant-bountiful-min" class="upgrade">
+                <div class="upgrade-header">
+                  <span>✨ Bountiful (Min)</span>
+                  <strong class="upgrade-quantity" id="popup-enchant-bountiful-min-level">0</strong>
+                </div>
+                <small id="popup-enchant-bountiful-min-stat">Current min: 2.00x → Upgrading to: 2.20x</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-min-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-enchant-bountiful-max" class="upgrade">
+                <div class="upgrade-header">
+                  <span>✨ Bountiful (Max)</span>
+                  <strong class="upgrade-quantity" id="popup-enchant-bountiful-max-level">0</strong>
+                </div>
+                <small id="popup-enchant-bountiful-max-stat">Current max: 2.00x → Upgrading to: 2.30x</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-max-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-enrich-min" class="upgrade">
+                <div class="upgrade-header">
+                  <span>💜 Enrich (Min)</span>
+                  <strong class="upgrade-quantity" id="popup-enrich-min-level">0</strong>
+                </div>
+                <small id="popup-enrich-min-stat">Current min: 1.50x → Upgrading to: 1.65x</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-enrich-min-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-enrich-max" class="upgrade">
+                <div class="upgrade-header">
+                  <span>💜 Enrich (Max)</span>
+                  <strong class="upgrade-quantity" id="popup-enrich-max-level">0</strong>
+                </div>
+                <small id="popup-enrich-max-stat">Current max: 2.00x → Upgrading to: 2.25x</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-enrich-max-cost">0</span></span>
+              </button>
+              <button id="popup-upgrade-enrich-chance" class="upgrade">
+                <div class="upgrade-header">
+                  <span>💜 Enrich Chance</span>
+                  <strong class="upgrade-quantity" id="popup-enrich-chance-level">0</strong>
+                </div>
+                <small id="popup-enrich-chance-stat">Current chance: 20% → Upgrading to: 28%</small>
+                <span class="upgrade-cost-row">Cost: <span id="popup-enrich-chance-cost">0</span></span>
+              </button>
+              <button id="popup-unlock-class" class="hidden">Unlock Class (250)</button>
+              <button id="popup-reposition">Reposition</button>
+            </section>
+          </div>
         </section>
+      </section>
 
-        <section class="panel upgrades" aria-label="Upgrades">
+      <p id="status" class="status" aria-live="polite"></p>
+
+      <footer class="mobile-footer" aria-label="Mobile navigation">
+        <button id="inventory-toggle-mobile" class="mobile-footer-button" aria-expanded="false">Inventory</button>
+        <button id="upgrades-toggle-mobile" class="mobile-footer-button" aria-expanded="false">Upgrades</button>
+        <button id="map-toggle-mobile" class="mobile-footer-button" aria-expanded="false">Map</button>
+        <button id="workers-toggle-mobile" class="mobile-footer-button" aria-expanded="false">Workers</button>
+      </footer>
+    </main>
+
+    <section id="workers-modal" class="modal hidden" aria-label="Workers" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card workers-modal-card">
+        <header class="modal-header">
+          <h2>Workers</h2>
+          <div class="modal-actions">
+            <button id="close-workers-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body workers-modal-body">
+          <section class="workers-section" aria-label="Active workers">
+            <h3>Active Workers</h3>
+            <div id="workers-list" class="workers-list"></div>
+          </section>
+          <section id="workers-panel-host" class="workers-panel-host" aria-label="Selected worker details"></section>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings-modal" class="modal hidden" aria-label="Settings" aria-hidden="true">
+      <div id="settings-backdrop" class="modal-backdrop"></div>
+      <div class="panel modal-card">
+        <header class="modal-header">
+          <h2>Settings</h2>
+          <div class="modal-actions">
+            <button id="save">Save</button>
+            <button id="add-coins">Patreon</button>
+            <button id="reset" class="danger">Reset</button>
+          </div>
+        </header>
+        <div class="modal-body">
+          <section class="settings-section" aria-label="Accessability Settings">
+            <h3>Accessability Settings</h3>
+            <button id="toggle-left-handed-mode">Left Handed Mode: Off</button>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="class-modal" class="modal hidden" aria-label="Choose class" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card">
+        <header class="modal-header">
+          <h2>Choose Specialization</h2>
+          <div class="modal-actions">
+            <button id="close-class-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body">
+          <button id="class-pick-vein-finder" class="upgrade">
+            <div class="upgrade-header"><span>🧭 Prospector</span></div>
+            <small>Boosts respawn weight of mined ore</small>
+          </button>
+          <button id="class-pick-crit" class="upgrade">
+            <div class="upgrade-header"><span>🎯 Crit Build</span></div>
+            <small>Unlocks crit chance and crit multiplier upgrades</small>
+          </button>
+          <button id="class-pick-chain-lightning" class="upgrade">
+            <div class="upgrade-header"><span>Chain Lightning</span></div>
+            <small>10% proc with adjacent chain scaling</small>
+          </button>
+          <button id="class-pick-foreman" class="upgrade">
+            <div class="upgrade-header"><span>🛠 Foreman</span></div>
+            <small>Support aura for nearby workers with Motivation, Autonomy, and Overtime</small>
+          </button>
+          <button id="class-pick-double-activation" class="upgrade">
+            <div class="upgrade-header"><span>⏩ Multi Activator</span></div>
+            <small>Unlocks min/max extra activation range upgrades</small>
+          </button>
+          <button id="class-pick-arcanist" class="upgrade">
+            <div class="upgrade-header"><span>✨ Arcanist</span></div>
+            <small>Unlocks Enchant Bountiful upgrades</small>
+          </button>
+          <button id="class-pick-enricher" class="upgrade">
+            <div class="upgrade-header"><span>💜 Enricher</span></div>
+            <small>Applies Enriched enchantments instead of activating tiles</small>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="inventory-modal" class="modal hidden" aria-label="Inventory" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card inventory-modal-card">
+        <header class="modal-header">
+          <h2>Inventory</h2>
+          <div class="modal-actions">
+            <button id="inventory-auto-sell-toggle">Auto Sell: Off</button>
+            <button id="close-inventory-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body">
+          <section id="resource-stats-panel" class="resource-stats-panel resource-stats-panel-inline" aria-label="Resource stats">
+            <div class="miner-popup-header">
+              <h3>Resource Stats</h3>
+              <div class="resource-stats-actions">
+                <button id="sell-all-resources" class="resource-sell-all">Sell All</button>
+              </div>
+            </div>
+            <div class="resource-legend-header">
+              <span>Resource</span>
+              <span>Generation Chance</span>
+              <span>Value</span>
+              <span>Inventory</span>
+              <span>Sell All</span>
+            </div>
+            <div id="resource-legend-body" class="resource-legend-body"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="upgrades-modal" class="modal hidden" aria-label="Upgrades" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="panel modal-card upgrades-modal-card">
+        <header class="modal-header">
+          <h2>Upgrades</h2>
+          <div class="modal-actions">
+            <button id="close-upgrades-modal">Close</button>
+          </div>
+        </header>
+        <div class="modal-body upgrades-modal-body">
           <div class="upgrades-header">
-            <h2>Upgrades</h2>
+            <h3>Upgrade List</h3>
             <button id="toggle-upgrades-accordion" class="close-button" aria-label="Collapse upgrades" aria-expanded="true">▾</button>
           </div>
-
           <div id="upgrades-accordion-body" class="upgrades-accordion-body">
             <button id="buy-idle-miner" class="upgrade">
               <div class="upgrade-header">
@@ -145,244 +440,6 @@
               <span class="upgrade-cost-row">Cost: <span id="gemstone-generation-cost">575</span></span>
             </button>
           </div>
-
-          <section id="miner-popup" class="miner-popup hidden" aria-label="Miner options">
-            <div class="miner-popup-header">
-              <h3 id="miner-popup-title">Miner</h3>
-              <button id="close-miner-popup" class="close-button" aria-label="Close miner panel">✕</button>
-            </div>
-            <button id="popup-choose-class" class="hidden">Choose Class</button>
-            <div class="upgrade">
-              <div class="upgrade-header">
-                <span>Targeting</span>
-                <strong class="upgrade-quantity">Mode</strong>
-              </div>
-              <div class="upgrade-header">
-                <button id="popup-targeting-random">Random</button>
-                <button id="popup-targeting-high">High Quality</button>
-                <button id="popup-targeting-low">Low Quality</button>
-              </div>
-            </div>
-            <button id="popup-upgrade-speed" class="upgrade">
-              <div class="upgrade-header">
-                <span id="popup-speed-label">Faster Miner</span>
-                <strong class="upgrade-quantity" id="popup-speed-level">0</strong>
-              </div>
-              <small id="popup-speed-stat">Current: 0.20 act/sec → Upgrading to: 0.30 act/sec</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-speed-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-radius" class="upgrade">
-              <div class="upgrade-header">
-                <span id="popup-radius-label">Wider Mining Radius</span>
-                <strong class="upgrade-quantity" id="popup-radius-level">0</strong>
-              </div>
-              <small id="popup-radius-stat">Current: 90px radius → Upgrading to: 113px radius</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-radius-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-overtime" class="upgrade">
-              <div class="upgrade-header">
-                <span>Overtime</span>
-                <strong class="upgrade-quantity" id="popup-overtime-level">0</strong>
-              </div>
-              <small id="popup-overtime-stat">Current aura bonus: +0% → Upgrading to: +3%</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-overtime-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-double-activation-min" class="upgrade">
-              <div class="upgrade-header">
-                <span>⏩ Multi Activation (Min)</span>
-                <strong class="upgrade-quantity" id="popup-double-activation-min-level">0</strong>
-              </div>
-              <small id="popup-double-activation-min-stat">Current min: 0% → Upgrading to: 10%</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-double-activation-min-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-double-activation-max" class="upgrade">
-              <div class="upgrade-header">
-                <span>⏩ Multi Activation (Max)</span>
-                <strong class="upgrade-quantity" id="popup-double-activation-max-level">0</strong>
-              </div>
-              <small id="popup-double-activation-max-stat">Current max: 0% → Upgrading to: 20%</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-double-activation-max-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-vein-finder" class="upgrade">
-              <div class="upgrade-header">
-                <span>🧭 Prospector</span>
-                <strong class="upgrade-quantity" id="popup-vein-finder-level">0</strong>
-              </div>
-              <small id="popup-vein-finder-stat">Current boost: +0% → Upgrading to: +25% for mined ore respawn weight</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-vein-finder-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-crit-chance" class="upgrade">
-              <div class="upgrade-header">
-                <span>🎯 Crit Build (Chance)</span>
-                <strong class="upgrade-quantity" id="popup-crit-chance-level">0</strong>
-              </div>
-              <small id="popup-crit-chance-stat">Current chance: 0% → Upgrading to: 3%</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-crit-chance-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-crit-multiplier" class="upgrade">
-              <div class="upgrade-header">
-                <span>🎯 Crit Build (Multiplier)</span>
-                <strong class="upgrade-quantity" id="popup-crit-multiplier-level">0</strong>
-              </div>
-              <small id="popup-crit-multiplier-stat">Current crit: 2.0x → Upgrading to: 2.2x</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-crit-multiplier-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-chain-reaction" class="upgrade">
-              <div class="upgrade-header">
-                <span>Chain Lightning</span>
-                <strong class="upgrade-quantity" id="popup-chain-reaction-level">0</strong>
-              </div>
-              <small id="popup-chain-reaction-stat">Locked. 0% chance → Unlocks 1 adjacent chain</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-chain-reaction-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-metal-bias" class="upgrade">
-              <div class="upgrade-header">
-                <span>Metal Bias</span>
-                <strong class="upgrade-quantity" id="popup-metal-bias-level">0</strong>
-              </div>
-              <small id="popup-metal-bias-stat">Current metal bias: 0% → Upgrading to: 5%</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-metal-bias-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-electric-efficiency" class="upgrade">
-              <div class="upgrade-header">
-                <span>Electric Efficiency</span>
-                <strong class="upgrade-quantity" id="popup-electric-efficiency-level">0</strong>
-              </div>
-              <small id="popup-electric-efficiency-stat">Current extension chance: 0% → Upgrading to: 5% on metal chain</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-electric-efficiency-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-enchant-bountiful" class="upgrade">
-              <div class="upgrade-header">
-                <span>✨ Enchant Bountiful</span>
-                <strong class="upgrade-quantity" id="popup-enchant-bountiful-level">0</strong>
-              </div>
-              <small id="popup-enchant-bountiful-stat">Current chance: 0% → Upgrading to: 15% to apply Bountiful enchantment</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-enchant-bountiful-min" class="upgrade">
-              <div class="upgrade-header">
-                <span>✨ Bountiful (Min)</span>
-                <strong class="upgrade-quantity" id="popup-enchant-bountiful-min-level">0</strong>
-              </div>
-              <small id="popup-enchant-bountiful-min-stat">Current min: 2.00x → Upgrading to: 2.20x</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-min-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-enchant-bountiful-max" class="upgrade">
-              <div class="upgrade-header">
-                <span>✨ Bountiful (Max)</span>
-                <strong class="upgrade-quantity" id="popup-enchant-bountiful-max-level">0</strong>
-              </div>
-              <small id="popup-enchant-bountiful-max-stat">Current max: 2.00x → Upgrading to: 2.30x</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-enchant-bountiful-max-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-enrich-min" class="upgrade">
-              <div class="upgrade-header">
-                <span>💜 Enrich (Min)</span>
-                <strong class="upgrade-quantity" id="popup-enrich-min-level">0</strong>
-              </div>
-              <small id="popup-enrich-min-stat">Current min: 1.50x → Upgrading to: 1.65x</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-enrich-min-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-enrich-max" class="upgrade">
-              <div class="upgrade-header">
-                <span>💜 Enrich (Max)</span>
-                <strong class="upgrade-quantity" id="popup-enrich-max-level">0</strong>
-              </div>
-              <small id="popup-enrich-max-stat">Current max: 2.00x → Upgrading to: 2.25x</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-enrich-max-cost">0</span></span>
-            </button>
-            <button id="popup-upgrade-enrich-chance" class="upgrade">
-              <div class="upgrade-header">
-                <span>💜 Enrich Chance</span>
-                <strong class="upgrade-quantity" id="popup-enrich-chance-level">0</strong>
-              </div>
-              <small id="popup-enrich-chance-stat">Current chance: 20% → Upgrading to: 28%</small>
-              <span class="upgrade-cost-row">Cost: <span id="popup-enrich-chance-cost">0</span></span>
-            </button>
-            <button id="popup-unlock-class" class="hidden">Unlock Class (250)</button>
-            <button id="popup-reposition">Reposition</button>
-          </section>
-        </section>
-      </section>
-
-      <p id="status" class="status" aria-live="polite"></p>
-    </main>
-
-    <section id="settings-modal" class="modal hidden" aria-label="Settings" aria-hidden="true">
-      <div id="settings-backdrop" class="modal-backdrop"></div>
-      <div class="panel modal-card">
-        <header class="modal-header">
-          <h2>Settings</h2>
-          <div class="modal-actions">
-            <button id="save">Save</button>
-            <button id="reset" class="danger">Reset</button>
-          </div>
-        </header>
-        <div class="modal-body"></div>
-      </div>
-    </section>
-
-    <section id="class-modal" class="modal hidden" aria-label="Choose class" aria-hidden="true">
-      <div class="modal-backdrop"></div>
-      <div class="panel modal-card">
-        <header class="modal-header">
-          <h2>Choose Specialization</h2>
-          <div class="modal-actions">
-            <button id="close-class-modal">Close</button>
-          </div>
-        </header>
-        <div class="modal-body">
-          <button id="class-pick-vein-finder" class="upgrade">
-            <div class="upgrade-header"><span>🧭 Prospector</span></div>
-            <small>Boosts respawn weight of mined ore</small>
-          </button>
-          <button id="class-pick-crit" class="upgrade">
-            <div class="upgrade-header"><span>🎯 Crit Build</span></div>
-            <small>Unlocks crit chance and crit multiplier upgrades</small>
-          </button>
-          <button id="class-pick-chain-lightning" class="upgrade">
-            <div class="upgrade-header"><span>Chain Lightning</span></div>
-            <small>10% proc with adjacent chain scaling</small>
-          </button>
-          <button id="class-pick-foreman" class="upgrade">
-            <div class="upgrade-header"><span>🛠 Foreman</span></div>
-            <small>Support aura for nearby workers with Motivation, Autonomy, and Overtime</small>
-          </button>
-          <button id="class-pick-double-activation" class="upgrade">
-            <div class="upgrade-header"><span>⏩ Multi Activator</span></div>
-            <small>Unlocks min/max extra activation range upgrades</small>
-          </button>
-          <button id="class-pick-arcanist" class="upgrade">
-            <div class="upgrade-header"><span>✨ Arcanist</span></div>
-            <small>Unlocks Enchant Bountiful upgrades</small>
-          </button>
-          <button id="class-pick-enricher" class="upgrade">
-            <div class="upgrade-header"><span>💜 Enricher</span></div>
-            <small>Applies Enriched enchantments instead of activating tiles</small>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section id="inventory-modal" class="modal hidden" aria-label="Inventory" aria-hidden="true">
-      <div class="modal-backdrop"></div>
-      <div class="panel modal-card inventory-modal-card">
-        <header class="modal-header">
-          <h2>Inventory</h2>
-          <div class="modal-actions">
-            <button id="inventory-auto-sell-toggle">Auto Sell: Off</button>
-            <button id="close-inventory-modal">Close</button>
-          </div>
-        </header>
-        <div class="modal-body">
-          <div class="inventory-header-row">
-            <span>Resource</span>
-            <span>Owned</span>
-            <span>Value</span>
-            <span>Total</span>
-            <span>Action</span>
-          </div>
-          <div id="inventory-list" class="inventory-list"></div>
         </div>
       </div>
     </section>

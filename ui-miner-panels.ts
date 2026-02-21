@@ -176,11 +176,8 @@ interface MinerStatsUi {
   minerStatsTitle: HTMLElement | null;
   statsMinerPosition: HTMLElement | null;
   statsMinerRate: HTMLElement | null;
-  statsMinerCooldown: HTMLElement | null;
   statsMinerRadius: HTMLElement | null;
-  statsMinerSpeedLevel: HTMLElement | null;
-  statsMinerRadiusLevel: HTMLElement | null;
-  statsDoubleActivationRange: HTMLElement | null;
+  statsClassDetails: HTMLElement | null;
 }
 
 interface MinerStatsViewModel {
@@ -188,11 +185,8 @@ interface MinerStatsViewModel {
   title: string;
   positionText: string;
   rateText: string;
-  cooldownText: string;
   radiusText: string;
-  speedLevel: number;
-  radiusLevel: number;
-  doubleActivationRangeText: string;
+  classStatRows: Array<{ label: string; value: string }>;
 }
 
 export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel): void {
@@ -329,9 +323,21 @@ export function renderMinerStatsPanelView(ui: MinerStatsUi, view: MinerStatsView
   if (ui.minerStatsTitle) ui.minerStatsTitle.textContent = view.title;
   if (ui.statsMinerPosition) ui.statsMinerPosition.textContent = view.positionText;
   if (ui.statsMinerRate) ui.statsMinerRate.textContent = view.rateText;
-  if (ui.statsMinerCooldown) ui.statsMinerCooldown.textContent = view.cooldownText;
   if (ui.statsMinerRadius) ui.statsMinerRadius.textContent = view.radiusText;
-  if (ui.statsMinerSpeedLevel) ui.statsMinerSpeedLevel.textContent = view.speedLevel.toString();
-  if (ui.statsMinerRadiusLevel) ui.statsMinerRadiusLevel.textContent = view.radiusLevel.toString();
-  if (ui.statsDoubleActivationRange) ui.statsDoubleActivationRange.textContent = view.doubleActivationRangeText;
+  if (ui.statsClassDetails) {
+    ui.statsClassDetails.innerHTML = "";
+    for (const statRow of view.classStatRows) {
+      const row = document.createElement("p");
+      row.className = "miner-stat-row";
+
+      const labelNode = document.createElement("span");
+      labelNode.textContent = statRow.label;
+
+      const valueNode = document.createElement("strong");
+      valueNode.textContent = statRow.value;
+
+      row.append(labelNode, valueNode);
+      ui.statsClassDetails.appendChild(row);
+    }
+  }
 }

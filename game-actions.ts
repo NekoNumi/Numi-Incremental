@@ -2,6 +2,7 @@ import type { GameState, UpgradableOre } from "./game-types";
 
 interface CreateGameActionsArgs {
   state: GameState;
+  maxMapSize: number;
   saveKey: string;
   clearSavedGame: (saveKey: string) => void;
   createDefaultResources: () => GameState["resources"];
@@ -37,6 +38,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
 } {
   const {
     state,
+    maxMapSize,
     saveKey,
     clearSavedGame,
     createDefaultResources,
@@ -71,6 +73,7 @@ export function createGameActions(args: CreateGameActionsArgs): {
     state.coins = 0;
     state.activePlaySeconds = 0;
     state.autoSellEnabled = false;
+    state.leftHandedMode = false;
     state.idleMinerOwned = 0;
     state.mapExpansions = 0;
     state.resources = createDefaultResources();
@@ -87,6 +90,9 @@ export function createGameActions(args: CreateGameActionsArgs): {
   }
 
   function buyMapExpansion(): void {
+    if (state.mapExpansions >= maxMapSize - 1) {
+      return;
+    }
     const cost = getMapExpansionCost();
     if (!canAfford(cost)) {
       return;

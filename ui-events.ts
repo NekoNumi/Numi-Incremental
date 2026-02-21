@@ -1,4 +1,5 @@
 import type { OreType, UnitSpecialization } from "./game-types";
+import { MOBILE_BREAKPOINT_PX } from "./game-constants";
 
 const SELLABLE_ORES: OreType[] = ["sand", "coal", "copper", "iron", "silver", "gold", "sapphire", "ruby", "emerald", "diamond", "amethyst"];
 
@@ -8,10 +9,21 @@ function isSellableOre(value: unknown): value is OreType {
 
 interface UiRefs {
   settingsToggle: HTMLElement | null;
+  settingsToggleMobile: HTMLElement | null;
   settingsModal: HTMLElement | null;
   inventoryToggle: HTMLButtonElement | null;
+  inventoryToggleMobile: HTMLButtonElement | null;
+  upgradesToggle: HTMLButtonElement | null;
+  upgradesToggleMobile: HTMLButtonElement | null;
+  mapToggleMobile: HTMLButtonElement | null;
+  workersToggleMobile: HTMLButtonElement | null;
+  workersModal: HTMLElement | null;
+  closeWorkersModal: HTMLButtonElement | null;
+  workersList: HTMLElement | null;
   inventoryModal: HTMLElement | null;
+  upgradesModal: HTMLElement | null;
   closeInventoryModal: HTMLButtonElement | null;
+  closeUpgradesModal: HTMLButtonElement | null;
   inventoryAutoSellToggle: HTMLButtonElement | null;
   mapGrid: HTMLElement | null;
   minerRing: HTMLElement | null;
@@ -70,6 +82,8 @@ interface UiRefs {
   popupTargetingHigh: HTMLButtonElement | null;
   popupTargetingLow: HTMLButtonElement | null;
   save: HTMLButtonElement | null;
+  addCoins: HTMLButtonElement | null;
+  toggleLeftHandedMode: HTMLButtonElement | null;
   reset: HTMLButtonElement | null;
 }
 
@@ -78,11 +92,16 @@ interface BindUiEventsArgs {
   state: { idleMinerOwned: number };
   interactionState: { placementMode: boolean; selectedMinerIndex: number | null };
   setSettingsModalOpen: (isOpen: boolean) => void;
+  setWorkersModalOpen: (isOpen: boolean) => void;
   closeMinerPanels: () => void;
   closeResourceStatsPanel: () => void;
   setClassModalOpen: (isOpen: boolean) => void;
   setInventoryModalOpen: (isOpen: boolean) => void;
+  setUpgradesModalOpen: (isOpen: boolean) => void;
   toggleInventoryAutoSell: () => void;
+  toggleLeftHandedMode: () => void;
+  openWorkersPanel: () => void;
+  selectWorkerFromList: (workerIndex: number) => void;
   activateTile: (tile: HTMLElement) => void;
   openMinerPanels: (minerIndex: number) => void;
   moveMinerToPointer: (clientX: number, clientY: number) => void;
@@ -129,6 +148,7 @@ interface BindUiEventsArgs {
   selectMinerSpecialization: (spec: Exclude<UnitSpecialization, "Worker">) => void;
   setMinerTargeting: (mode: "random" | "high-quality" | "low-quality") => void;
   saveGame: (showStatus?: boolean) => void;
+  addCoinsCheat: () => void;
   resetGame: () => void;
 }
 
@@ -138,11 +158,16 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     state,
     interactionState,
     setSettingsModalOpen,
+    setWorkersModalOpen,
     closeMinerPanels,
     closeResourceStatsPanel,
     setClassModalOpen,
     setInventoryModalOpen,
+    setUpgradesModalOpen,
     toggleInventoryAutoSell,
+    toggleLeftHandedMode,
+    openWorkersPanel,
+    selectWorkerFromList,
     activateTile,
     openMinerPanels,
     moveMinerToPointer,
@@ -189,11 +214,42 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     selectMinerSpecialization,
     setMinerTargeting,
     saveGame,
+    addCoinsCheat,
     resetGame,
   } = args;
 
+  let placementDragActive = false;
+
+  function handlePlacementPointer(clientX: number, clientY: number, target: HTMLElement): void {
+    const tile = target.closest(".map-tile") as HTMLElement | null;
+    if (tile) {
+      const tileBounds = tile.getBoundingClientRect();
+      moveMinerToPointer(tileBounds.left + tileBounds.width / 2, tileBounds.top + tileBounds.height / 2);
+    } else {
+      moveMinerToPointer(clientX, clientY);
+    }
+    render();
+  }
+
+  function finalizeDesktopPlacement(): void {
+    if (window.innerWidth <= MOBILE_BREAKPOINT_PX || !interactionState.placementMode) {
+      return;
+    }
+    interactionState.placementMode = false;
+    placementDragActive = false;
+    render();
+  }
+
   if (ui.settingsToggle) {
     ui.settingsToggle.addEventListener("click", () => {
+      if (!ui.settingsModal) return;
+      const isHidden = ui.settingsModal.classList.contains("hidden");
+      setSettingsModalOpen(isHidden);
+    });
+  }
+
+  if (ui.settingsToggleMobile) {
+    ui.settingsToggleMobile.addEventListener("click", () => {
       if (!ui.settingsModal) return;
       const isHidden = ui.settingsModal.classList.contains("hidden");
       setSettingsModalOpen(isHidden);
@@ -221,9 +277,91 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     });
   }
 
+  if (ui.inventoryToggleMobile) {
+    ui.inventoryToggleMobile.addEventListener("click", () => {
+      setInventoryModalOpen(true);
+    });
+  }
+
   if (ui.closeInventoryModal) {
     ui.closeInventoryModal.addEventListener("click", () => {
       setInventoryModalOpen(false);
+    });
+  }
+
+  if (ui.upgradesToggle) {
+    ui.upgradesToggle.addEventListener("click", () => {
+      if (!ui.upgradesModal) return;
+      const isHidden = ui.upgradesModal.classList.contains("hidden");
+      setUpgradesModalOpen(isHidden);
+    });
+  }
+
+  if (ui.upgradesToggleMobile) {
+    ui.upgradesToggleMobile.addEventListener("click", () => {
+      setUpgradesModalOpen(true);
+    });
+  }
+
+  if (ui.mapToggleMobile) {
+    ui.mapToggleMobile.addEventListener("click", () => {
+      setInventoryModalOpen(false);
+      setUpgradesModalOpen(false);
+      setWorkersModalOpen(false);
+      setSettingsModalOpen(false);
+    });
+  }
+
+  if (ui.workersToggleMobile) {
+    ui.workersToggleMobile.addEventListener("click", openWorkersPanel);
+  }
+
+  if (ui.closeWorkersModal) {
+    ui.closeWorkersModal.addEventListener("click", () => {
+      setWorkersModalOpen(false);
+    });
+  }
+
+  if (ui.workersModal) {
+    ui.workersModal.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.closest(".modal-card")) {
+        return;
+      }
+      setWorkersModalOpen(false);
+    });
+  }
+
+  if (ui.workersList) {
+    ui.workersList.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const workerButton = target.closest(".workers-list-item") as HTMLButtonElement | null;
+      if (!(workerButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      const workerIndex = Number(workerButton.dataset.workerIndex);
+      if (!Number.isInteger(workerIndex) || workerIndex < 0 || workerIndex >= state.idleMinerOwned) {
+        return;
+      }
+
+      selectWorkerFromList(workerIndex);
+    });
+  }
+
+  if (ui.closeUpgradesModal) {
+    ui.closeUpgradesModal.addEventListener("click", () => {
+      setUpgradesModalOpen(false);
     });
   }
 
@@ -244,6 +382,19 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     });
   }
 
+  if (ui.upgradesModal) {
+    ui.upgradesModal.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.closest(".modal-card")) {
+        return;
+      }
+      setUpgradesModalOpen(false);
+    });
+  }
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       setSettingsModalOpen(false);
@@ -251,6 +402,8 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
       closeResourceStatsPanel();
       setClassModalOpen(false);
       setInventoryModalOpen(false);
+      setUpgradesModalOpen(false);
+      setWorkersModalOpen(false);
     }
   });
 
@@ -260,21 +413,53 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
       if (!(target instanceof HTMLElement)) {
         return;
       }
-      event.preventDefault();
 
-      if (interactionState.placementMode && interactionState.selectedMinerIndex !== null) {
+      if (interactionState.placementMode) {
+        if (window.innerWidth <= MOBILE_BREAKPOINT_PX) {
+          event.preventDefault();
+          placementDragActive = true;
+          handlePlacementPointer(event.clientX, event.clientY, target);
+          return;
+        }
+        handlePlacementPointer(event.clientX, event.clientY, target);
+        finalizeDesktopPlacement();
         return;
       }
+
+      event.preventDefault();
 
       if (!target.classList.contains("map-tile")) {
         return;
       }
       activateTile(target);
     });
+
+    ui.mapGrid.addEventListener("click", (event) => {
+      if (!interactionState.placementMode) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      handlePlacementPointer(event.clientX, event.clientY, target);
+      finalizeDesktopPlacement();
+    });
   }
 
   if (ui.minerRing) {
     ui.minerRing.addEventListener("pointerdown", (event) => {
+      if (interactionState.placementMode && window.innerWidth <= MOBILE_BREAKPOINT_PX) {
+        return;
+      }
+
+      if (window.innerWidth <= MOBILE_BREAKPOINT_PX) {
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       if (!(target instanceof HTMLElement)) {
         return;
@@ -296,14 +481,25 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   }
 
   window.addEventListener("pointermove", (event) => {
+    if (interactionState.placementMode && window.innerWidth > MOBILE_BREAKPOINT_PX) {
+      moveMinerToPointer(event.clientX, event.clientY);
+      render();
+      return;
+    }
+
+    if (!placementDragActive) {
+      return;
+    }
     moveMinerToPointer(event.clientX, event.clientY);
+    render();
   });
 
   window.addEventListener("pointerup", () => {
-    if (interactionState.placementMode && interactionState.selectedMinerIndex !== null) {
-      interactionState.placementMode = false;
-      render();
-    }
+    placementDragActive = false;
+  });
+
+  window.addEventListener("pointercancel", () => {
+    placementDragActive = false;
   });
 
   if (ui.mapEnvironment) {
@@ -312,6 +508,60 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
       if (!(target instanceof HTMLElement)) {
         return;
       }
+
+      if (!interactionState.placementMode) {
+        return;
+      }
+
+      if (window.innerWidth <= MOBILE_BREAKPOINT_PX) {
+        event.preventDefault();
+        placementDragActive = true;
+        handlePlacementPointer(event.clientX, event.clientY, target);
+        return;
+      }
+      handlePlacementPointer(event.clientX, event.clientY, target);
+      finalizeDesktopPlacement();
+    });
+
+    ui.mapEnvironment.addEventListener("pointermove", (event) => {
+      if (!interactionState.placementMode || !placementDragActive) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      handlePlacementPointer(event.clientX, event.clientY, target);
+    });
+
+    ui.mapEnvironment.addEventListener("click", (event) => {
+      if (!interactionState.placementMode) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const tile = target.closest(".map-tile") as HTMLElement | null;
+      if (tile) {
+        const tileBounds = tile.getBoundingClientRect();
+        moveMinerToPointer(tileBounds.left + tileBounds.width / 2, tileBounds.top + tileBounds.height / 2);
+      } else {
+        moveMinerToPointer(event.clientX, event.clientY);
+      }
+
+      if (window.innerWidth > MOBILE_BREAKPOINT_PX) {
+        interactionState.placementMode = false;
+        placementDragActive = false;
+      }
+      render();
     });
   }
 
@@ -348,7 +598,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     if (sellOneButton instanceof HTMLButtonElement) {
       const ore = sellOneButton.dataset.ore;
       if (isSellableOre(ore)) {
-        sellOneResource(ore);
+        sellAllByResource(ore);
       }
       return;
     }
@@ -403,5 +653,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.popupTargetingHigh) ui.popupTargetingHigh.addEventListener("click", () => setMinerTargeting("high-quality"));
   if (ui.popupTargetingLow) ui.popupTargetingLow.addEventListener("click", () => setMinerTargeting("low-quality"));
   if (ui.save) ui.save.addEventListener("click", () => saveGame(true));
+  if (ui.addCoins) ui.addCoins.addEventListener("click", addCoinsCheat);
+  if (ui.toggleLeftHandedMode) ui.toggleLeftHandedMode.addEventListener("click", toggleLeftHandedMode);
   if (ui.reset) ui.reset.addEventListener("click", resetGame);
 }

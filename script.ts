@@ -1,8 +1,16 @@
 import {
+  applyMapScale,
   BASE_MINER_EFFECT_RADIUS_PX,
+  MAX_MAP_SIZE,
+  MAP_SCALE,
+  MOBILE_BREAKPOINT_PX,
+  getMapPixelSizeAtScale,
   MIN_TILE_COVERAGE_IN_RADIUS,
   SAVE_KEY,
   SPECIALIZATION_COST,
+  TILE_GAP_PX,
+  TILE_SIZE_PX,
+  VIEWPORT_MAP_SCALE,
 } from "./game-constants";
 import { createGameActions } from "./game-actions";
 import { runIdleMinersLoop } from "./game-loop";
@@ -14,7 +22,7 @@ import type {
   UnitSpecialization,
   UpgradeConfig,
 } from "./game-types";
-import { clamp } from "./map-geometry";
+import { clamp, getMapPixelSize } from "./map-geometry";
 import { createMinerActions } from "./miner-actions";
 import { createMinerLogic } from "./miner-logic";
 import { clearSavedGame, loadGameState, saveGameState } from "./persistence";
@@ -60,16 +68,31 @@ interface UIElements {
   idleMinerCost: HTMLElement | null;
   idleMinerOwned: HTMLElement | null;
   settingsToggle: HTMLElement | null;
+  settingsToggleMobile: HTMLElement | null;
   settingsModal: HTMLElement | null;
   inventoryToggle: HTMLButtonElement | null;
+  inventoryToggleMobile: HTMLButtonElement | null;
+  upgradesToggle: HTMLButtonElement | null;
+  upgradesToggleMobile: HTMLButtonElement | null;
+  mapToggleMobile: HTMLButtonElement | null;
+  workersToggleMobile: HTMLButtonElement | null;
+  mobileFooter: HTMLElement | null;
+  workersModal: HTMLElement | null;
+  closeWorkersModal: HTMLButtonElement | null;
+  workersList: HTMLElement | null;
+  workersPanelHost: HTMLElement | null;
   inventoryModal: HTMLElement | null;
+  upgradesModal: HTMLElement | null;
   closeInventoryModal: HTMLButtonElement | null;
+  closeUpgradesModal: HTMLButtonElement | null;
   inventoryAutoSellToggle: HTMLButtonElement | null;
   inventoryList: HTMLElement | null;
   upgradesAccordionBody: HTMLElement | null;
   toggleUpgradesAccordion: HTMLButtonElement | null;
   buyIdleMiner: HTMLButtonElement | null;
   save: HTMLButtonElement | null;
+  addCoins: HTMLButtonElement | null;
+  toggleLeftHandedMode: HTMLButtonElement | null;
   reset: HTMLButtonElement | null;
   mapEnvironment: HTMLElement | null;
   mapSize: HTMLElement | null;
@@ -222,11 +245,20 @@ interface UIElements {
   closeMinerStatsButton: HTMLButtonElement | null;
   statsMinerPosition: HTMLElement | null;
   statsMinerRate: HTMLElement | null;
-  statsMinerCooldown: HTMLElement | null;
   statsMinerRadius: HTMLElement | null;
-  statsMinerSpeedLevel: HTMLElement | null;
-  statsMinerRadiusLevel: HTMLElement | null;
-  statsDoubleActivationRange: HTMLElement | null;
+  statsClassDetails: HTMLElement | null;
+  minerStatsHost: HTMLElement | null;
+  minerPopupHost: HTMLElement | null;
+  mobileRepositionControls: HTMLElement | null;
+  mobileRepositionPrompt: HTMLElement | null;
+  repositionPrevWorkerButton: HTMLButtonElement | null;
+  repositionSelectWorkerButton: HTMLButtonElement | null;
+  repositionNextWorkerButton: HTMLButtonElement | null;
+  repositionWorkerModal: HTMLElement | null;
+  closeRepositionWorkerModalButton: HTMLButtonElement | null;
+  repositionWorkerModalList: HTMLElement | null;
+  confirmRepositionButton: HTMLButtonElement | null;
+  cancelRepositionButton: HTMLButtonElement | null;
 }
 
 // State
@@ -234,6 +266,7 @@ const state: GameState = {
   coins: 0,
   activePlaySeconds: 0,
   autoSellEnabled: false,
+  leftHandedMode: false,
   idleMinerOwned: 0,
   mapExpansions: 0,
   resources: [],
@@ -284,6 +317,16 @@ const INVENTORY_ORES: InventoryOre[] = ["sand", "coal", "copper", "iron", "silve
 const GEMSTONE_ORES: UpgradableOre[] = ["amethyst", "sapphire", "emerald", "ruby", "diamond"];
 const inventoryDirtyOres = new Set<InventoryOre>(INVENTORY_ORES);
 const inventoryRowRefs: Partial<Record<InventoryOre, InventoryRowRefs>> = {};
+type MobilePage = "map" | "inventory" | "upgrades" | "workers";
+let currentMobilePage: MobilePage = "map";
+let lastMobilePageBeforeSettings: MobilePage = "map";
+let restoringMobilePageFromSettings = false;
+let suppressSettingsRestore = false;
+let keepWorkerSelectionOnWorkersClose = false;
+let placementOriginalPosition: { x: number; y: number } | null = null;
+let placementCandidateSet = false;
+let activeRepositionMinerIndex: number | null = null;
+let repositionWorkerModalOpen = false;
 
 function markInventoryDirty(ore: InventoryOre): void {
   inventoryDirtyOres.add(ore);
@@ -405,16 +448,31 @@ const ui: UIElements = {
   idleMinerCost: document.getElementById("idle-miner-cost"),
   idleMinerOwned: document.getElementById("idle-miner-owned"),
   settingsToggle: document.getElementById("settings-toggle"),
+  settingsToggleMobile: document.getElementById("settings-toggle-mobile"),
   settingsModal: document.getElementById("settings-modal"),
   inventoryToggle: document.getElementById("inventory-toggle") as HTMLButtonElement,
+  inventoryToggleMobile: document.getElementById("inventory-toggle-mobile") as HTMLButtonElement,
+  upgradesToggle: document.getElementById("upgrades-toggle") as HTMLButtonElement,
+  upgradesToggleMobile: document.getElementById("upgrades-toggle-mobile") as HTMLButtonElement,
+  mapToggleMobile: document.getElementById("map-toggle-mobile") as HTMLButtonElement,
+  workersToggleMobile: document.getElementById("workers-toggle-mobile") as HTMLButtonElement,
+  mobileFooter: document.querySelector(".mobile-footer"),
+  workersModal: document.getElementById("workers-modal"),
+  closeWorkersModal: document.getElementById("close-workers-modal") as HTMLButtonElement,
+  workersList: document.getElementById("workers-list"),
+  workersPanelHost: document.getElementById("workers-panel-host"),
   inventoryModal: document.getElementById("inventory-modal"),
+  upgradesModal: document.getElementById("upgrades-modal"),
   closeInventoryModal: document.getElementById("close-inventory-modal") as HTMLButtonElement,
+  closeUpgradesModal: document.getElementById("close-upgrades-modal") as HTMLButtonElement,
   inventoryAutoSellToggle: document.getElementById("inventory-auto-sell-toggle") as HTMLButtonElement,
   inventoryList: document.getElementById("inventory-list"),
   upgradesAccordionBody: document.getElementById("upgrades-accordion-body"),
   toggleUpgradesAccordion: document.getElementById("toggle-upgrades-accordion") as HTMLButtonElement,
   buyIdleMiner: document.getElementById("buy-idle-miner") as HTMLButtonElement,
   save: document.getElementById("save") as HTMLButtonElement,
+  addCoins: document.getElementById("add-coins") as HTMLButtonElement,
+  toggleLeftHandedMode: document.getElementById("toggle-left-handed-mode") as HTMLButtonElement,
   reset: document.getElementById("reset") as HTMLButtonElement,
   mapEnvironment: document.getElementById("map-environment"),
   mapSize: document.getElementById("map-size"),
@@ -567,11 +625,20 @@ const ui: UIElements = {
   closeMinerStatsButton: document.getElementById("close-miner-stats") as HTMLButtonElement,
   statsMinerPosition: document.getElementById("stats-miner-position"),
   statsMinerRate: document.getElementById("stats-miner-rate"),
-  statsMinerCooldown: document.getElementById("stats-miner-cooldown"),
   statsMinerRadius: document.getElementById("stats-miner-radius"),
-  statsMinerSpeedLevel: document.getElementById("stats-miner-speed-level"),
-  statsMinerRadiusLevel: document.getElementById("stats-miner-radius-level"),
-  statsDoubleActivationRange: document.getElementById("stats-double-activation-range"),
+  statsClassDetails: document.getElementById("stats-class-details"),
+  minerStatsHost: document.getElementById("miner-stats-host"),
+  minerPopupHost: document.getElementById("miner-popup-host"),
+  mobileRepositionControls: document.getElementById("mobile-reposition-controls"),
+  mobileRepositionPrompt: document.getElementById("mobile-reposition-prompt"),
+  repositionPrevWorkerButton: document.getElementById("reposition-prev-worker") as HTMLButtonElement,
+  repositionSelectWorkerButton: document.getElementById("reposition-select-worker") as HTMLButtonElement,
+  repositionNextWorkerButton: document.getElementById("reposition-next-worker") as HTMLButtonElement,
+  repositionWorkerModal: document.getElementById("reposition-worker-modal"),
+  closeRepositionWorkerModalButton: document.getElementById("close-reposition-worker-modal") as HTMLButtonElement,
+  repositionWorkerModalList: document.getElementById("reposition-worker-modal-list"),
+  confirmRepositionButton: document.getElementById("confirm-reposition") as HTMLButtonElement,
+  cancelRepositionButton: document.getElementById("cancel-reposition") as HTMLButtonElement,
 };
 
 // Utility functions
@@ -588,7 +655,7 @@ function canOfferUpgrade(config: UpgradeConfig, canUpgrade: boolean): boolean {
 }
 
 function getMapSize(): number {
-  return 1 + state.mapExpansions;
+  return Math.min(MAX_MAP_SIZE, 1 + state.mapExpansions);
 }
 
 function getMapExpansionCost(): number {
@@ -739,6 +806,7 @@ const {
   getEnrichMinStatText,
   getEnrichMaxStatText,
   getEnrichChanceStatText,
+  getForemanOvertimeMultiplier,
   getMinerDisplayName,
   getMinerRingLabel,
   canOfferClassUnlock,
@@ -760,7 +828,7 @@ const {
   buildSpecializationData,
   getSpecializationLabel,
   minTileCoverageInRadius: MIN_TILE_COVERAGE_IN_RADIUS,
-  baseMinerEffectRadiusPx: BASE_MINER_EFFECT_RADIUS_PX,
+  getBaseMinerEffectRadiusPx: () => BASE_MINER_EFFECT_RADIUS_PX,
   idleMinerTriggerIntervalSeconds: idleMiner.triggerIntervalSeconds || 5,
   fasterMinerBonusClicksPerSecond: fasterMinerUpgrade.bonusClicksPerSecond || 0.1,
   minerRadiusBonusPerLevel: minerRadiusUpgrade.radiusBonusPerLevel || 0.25,
@@ -849,14 +917,248 @@ function setStatus(message: string): void {
   }, 1600);
 }
 
+function isMobileViewport(): boolean {
+  return window.innerWidth <= MOBILE_BREAKPOINT_PX;
+}
+
+function attachMinerPanelsToWorkersHost(): void {
+  if (!ui.workersPanelHost || !ui.minerStatsPanel || !ui.minerPopup) {
+    return;
+  }
+
+  ui.workersPanelHost.append(ui.minerStatsPanel, ui.minerPopup);
+}
+
+function restoreMinerPanelsToMap(): void {
+  if (!ui.minerStatsHost || !ui.minerPopupHost || !ui.minerStatsPanel || !ui.minerPopup) {
+    return;
+  }
+
+  ui.minerStatsHost.appendChild(ui.minerStatsPanel);
+  ui.minerPopupHost.appendChild(ui.minerPopup);
+}
+
+function renderWorkersList(): void {
+  if (!ui.workersList) {
+    return;
+  }
+
+  ui.workersList.innerHTML = "";
+
+  if (state.idleMinerOwned <= 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "workers-empty";
+    emptyState.textContent = "No workers yet. Buy an Idle Miner first.";
+    ui.workersList.appendChild(emptyState);
+    return;
+  }
+
+  for (let workerIndex = 0; workerIndex < state.idleMinerOwned; workerIndex += 1) {
+    const workerButton = document.createElement("button");
+    workerButton.type = "button";
+    workerButton.className = "workers-list-item";
+    workerButton.dataset.workerIndex = workerIndex.toString();
+    if (interactionState.selectedMinerIndex === workerIndex) {
+      workerButton.classList.add("active");
+    }
+    workerButton.textContent = getMinerDisplayName(workerIndex);
+    ui.workersList.appendChild(workerButton);
+  }
+}
+
+function getCurrentRepositionMinerIndex(): number | null {
+  const minerIndex = activeRepositionMinerIndex ?? interactionState.selectedMinerIndex;
+  if (minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+    return null;
+  }
+  return minerIndex;
+}
+
+function setRepositionTargetWorker(minerIndex: number): void {
+  if (minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+    return;
+  }
+
+  interactionState.selectedMinerIndex = minerIndex;
+  interactionState.placementMode = true;
+  activeRepositionMinerIndex = minerIndex;
+  const currentPosition = getMinerPosition(minerIndex);
+  placementOriginalPosition = { x: currentPosition.x, y: currentPosition.y };
+  placementCandidateSet = false;
+  repositionWorkerModalOpen = false;
+  render();
+}
+
+function selectPreviousRepositionWorker(): void {
+  const currentMinerIndex = getCurrentRepositionMinerIndex();
+  if (currentMinerIndex === null || state.idleMinerOwned <= 0) {
+    return;
+  }
+  const nextMinerIndex = (currentMinerIndex - 1 + state.idleMinerOwned) % state.idleMinerOwned;
+  setRepositionTargetWorker(nextMinerIndex);
+}
+
+function selectNextRepositionWorker(): void {
+  const currentMinerIndex = getCurrentRepositionMinerIndex();
+  if (currentMinerIndex === null || state.idleMinerOwned <= 0) {
+    return;
+  }
+  const nextMinerIndex = (currentMinerIndex + 1) % state.idleMinerOwned;
+  setRepositionTargetWorker(nextMinerIndex);
+}
+
+function toggleRepositionWorkerPicker(): void {
+  if (state.idleMinerOwned <= 0) {
+    return;
+  }
+
+  const previousMinerIndex = getCurrentRepositionMinerIndex();
+  if (interactionState.placementMode && previousMinerIndex !== null && placementOriginalPosition) {
+    state.idleMinerPositions[previousMinerIndex] = {
+      x: placementOriginalPosition.x,
+      y: placementOriginalPosition.y,
+    };
+  }
+
+  interactionState.placementMode = false;
+  interactionState.selectedMinerIndex = null;
+  activeRepositionMinerIndex = null;
+  placementOriginalPosition = null;
+  placementCandidateSet = false;
+  repositionWorkerModalOpen = true;
+  render();
+}
+
+function selectWorkerFromList(workerIndex: number): void {
+  if (workerIndex < 0 || workerIndex >= state.idleMinerOwned) {
+    return;
+  }
+
+  interactionState.selectedMinerIndex = workerIndex;
+  interactionState.repositionMode = false;
+  interactionState.placementMode = false;
+  interactionState.resourceStatsOpen = false;
+  interactionState.upgradePanelOpen = true;
+  interactionState.statsPanelOpen = true;
+
+  if (isMobileViewport() && ui.workersModal) {
+    ui.workersModal.classList.remove("hidden");
+    ui.workersModal.setAttribute("aria-hidden", "false");
+    currentMobilePage = "workers";
+    attachMinerPanelsToWorkersHost();
+  }
+
+  renderMinerStatsPanel();
+  renderMinerPopup();
+  renderWorkersList();
+}
+
+function setWorkersModalOpen(isOpen: boolean): void {
+  if (!ui.workersModal) {
+    return;
+  }
+
+  const shouldOpen = isOpen && isMobileViewport();
+  if (shouldOpen) {
+    setInventoryModalOpen(false);
+    setUpgradesModalOpen(false);
+    suppressSettingsRestore = true;
+    setSettingsModalOpen(false);
+    suppressSettingsRestore = false;
+  }
+
+  ui.workersModal.classList.toggle("hidden", !shouldOpen);
+  ui.workersModal.setAttribute("aria-hidden", String(!shouldOpen));
+  if (shouldOpen) {
+    currentMobilePage = "workers";
+  } else if (isMobileViewport() && currentMobilePage === "workers") {
+    currentMobilePage = "map";
+  }
+  if (ui.workersToggleMobile) {
+    ui.workersToggleMobile.setAttribute("aria-expanded", String(shouldOpen));
+  }
+
+  if (shouldOpen) {
+    attachMinerPanelsToWorkersHost();
+    renderWorkersList();
+
+    if (state.idleMinerOwned <= 0) {
+      closeMinerPanels();
+      return;
+    }
+
+    const workerIndex =
+      interactionState.selectedMinerIndex !== null && interactionState.selectedMinerIndex < state.idleMinerOwned
+        ? interactionState.selectedMinerIndex
+        : 0;
+    openMinerPanels(workerIndex);
+    renderWorkersList();
+    return;
+  }
+
+  restoreMinerPanelsToMap();
+  if (isMobileViewport()) {
+    if (keepWorkerSelectionOnWorkersClose) {
+      keepWorkerSelectionOnWorkersClose = false;
+      interactionState.upgradePanelOpen = false;
+      interactionState.statsPanelOpen = false;
+      renderMinerStatsPanel();
+      renderMinerPopup();
+    } else {
+      closeMinerPanels();
+    }
+  }
+}
+
 function setInventoryModalOpen(isOpen: boolean): void {
-  if (!ui.inventoryModal || !ui.inventoryToggle) return;
+  if (!ui.inventoryModal) return;
+  if (isOpen && isMobileViewport()) {
+    setUpgradesModalOpen(false);
+    suppressSettingsRestore = true;
+    setSettingsModalOpen(false);
+    suppressSettingsRestore = false;
+    setWorkersModalOpen(false);
+  }
   ui.inventoryModal.classList.toggle("hidden", !isOpen);
   ui.inventoryModal.setAttribute("aria-hidden", String(!isOpen));
-  ui.inventoryToggle.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen && isMobileViewport()) {
+    currentMobilePage = "inventory";
+  } else if (!isOpen && isMobileViewport() && currentMobilePage === "inventory") {
+    currentMobilePage = "map";
+  }
+  if (ui.inventoryToggle) {
+    ui.inventoryToggle.setAttribute("aria-expanded", String(isOpen));
+  }
+  if (ui.inventoryToggleMobile) {
+    ui.inventoryToggleMobile.setAttribute("aria-expanded", String(isOpen));
+  }
   if (isOpen) {
     markAllInventoryDirty();
     renderInventoryModal();
+  }
+}
+
+function setUpgradesModalOpen(isOpen: boolean): void {
+  if (!ui.upgradesModal) return;
+  if (isOpen && isMobileViewport()) {
+    setInventoryModalOpen(false);
+    suppressSettingsRestore = true;
+    setSettingsModalOpen(false);
+    suppressSettingsRestore = false;
+    setWorkersModalOpen(false);
+  }
+  ui.upgradesModal.classList.toggle("hidden", !isOpen);
+  ui.upgradesModal.setAttribute("aria-hidden", String(!isOpen));
+  if (isOpen && isMobileViewport()) {
+    currentMobilePage = "upgrades";
+  } else if (!isOpen && isMobileViewport() && currentMobilePage === "upgrades") {
+    currentMobilePage = "map";
+  }
+  if (ui.upgradesToggle) {
+    ui.upgradesToggle.setAttribute("aria-expanded", String(isOpen));
+  }
+  if (ui.upgradesToggleMobile) {
+    ui.upgradesToggleMobile.setAttribute("aria-expanded", String(isOpen));
   }
 }
 
@@ -867,6 +1169,63 @@ function renderInventoryAutoSellToggle(): void {
 
   ui.inventoryAutoSellToggle.textContent = state.autoSellEnabled ? "Auto Sell: On" : "Auto Sell: Off";
   ui.inventoryAutoSellToggle.setAttribute("aria-pressed", String(state.autoSellEnabled));
+}
+
+function renderAccessabilitySettings(): void {
+  if (ui.toggleLeftHandedMode) {
+    ui.toggleLeftHandedMode.textContent = state.leftHandedMode ? "Left Handed Mode: On" : "Left Handed Mode: Off";
+    ui.toggleLeftHandedMode.setAttribute("aria-pressed", String(state.leftHandedMode));
+  }
+
+  document.body.classList.toggle("left-handed-mode", state.leftHandedMode);
+
+  if (ui.mobileFooter) {
+    ui.mobileFooter.classList.toggle("mobile-footer-left-handed", state.leftHandedMode);
+  }
+}
+
+function toggleLeftHandedMode(): void {
+  state.leftHandedMode = !state.leftHandedMode;
+  renderAccessabilitySettings();
+}
+
+function openWorkersPanel(): void {
+  if (state.idleMinerOwned <= 0) {
+    setStatus("No workers yet. Buy an Idle Miner first.");
+    if (isMobileViewport()) {
+      setWorkersModalOpen(true);
+      return;
+    }
+  }
+
+  setInventoryModalOpen(false);
+  setUpgradesModalOpen(false);
+  setSettingsModalOpen(false);
+
+  if (isMobileViewport()) {
+    setWorkersModalOpen(true);
+    return;
+  }
+
+  const workerIndex =
+    interactionState.selectedMinerIndex !== null && interactionState.selectedMinerIndex < state.idleMinerOwned
+      ? interactionState.selectedMinerIndex
+      : 0;
+  openMinerPanels(workerIndex);
+}
+
+function setMobilePage(page: MobilePage): void {
+  if (!isMobileViewport()) {
+    return;
+  }
+
+  currentMobilePage = page;
+  setInventoryModalOpen(page === "inventory");
+  setUpgradesModalOpen(page === "upgrades");
+  setWorkersModalOpen(page === "workers");
+  if (page === "map") {
+    closeMinerPanels();
+  }
 }
 
 function toggleInventoryAutoSell(): void {
@@ -987,6 +1346,13 @@ function saveGame(showStatus: boolean = true): void {
   }
 }
 
+function addCoinsCheat(): void {
+  const bonusCoins = 100000;
+  state.coins += bonusCoins;
+  setStatus(`Added ${bonusCoins.toLocaleString()} coins.`);
+  render();
+}
+
 function syncIdleMinerState(): void {
   while (state.idleMinerCooldowns.length < state.idleMinerOwned) {
     const minerIndex = state.idleMinerCooldowns.length;
@@ -1024,6 +1390,7 @@ function syncIdleMinerState(): void {
 
 function loadGame(): void {
   const outcome = loadGameState(SAVE_KEY, state, syncIdleMinerState, getCoinsPerSecond, round);
+  state.mapExpansions = Math.min(state.mapExpansions, MAX_MAP_SIZE - 1);
   syncGemstoneGenerationLevels();
   if (outcome.invalid) {
     setStatus("Save data was invalid and has been ignored.");
@@ -1051,7 +1418,7 @@ function renderUpgradesAccordion(): void {
 }
 
 const {
-  setSettingsModalOpen,
+  setSettingsModalOpen: setSettingsModalOpenBase,
   setClassModalOpen,
   openMinerPanels,
   toggleResourceStatsPanel,
@@ -1068,6 +1435,22 @@ const {
   renderMinerPopup,
   renderUpgradesAccordion,
 });
+
+function setSettingsModalOpen(isOpen: boolean): void {
+  const isMobile = isMobileViewport();
+  if (isMobile && isOpen) {
+    lastMobilePageBeforeSettings = currentMobilePage;
+    setMobilePage("map");
+  }
+
+  setSettingsModalOpenBase(isOpen);
+
+  if (isMobile && !isOpen && !restoringMobilePageFromSettings && !suppressSettingsRestore) {
+    restoringMobilePageFromSettings = true;
+    setMobilePage(lastMobilePageBeforeSettings);
+    restoringMobilePageFromSettings = false;
+  }
+}
 
 const { applyTileType, activateTile, triggerChainReaction } = createTileActions({
   mapGrid: ui.mapGrid,
@@ -1106,7 +1489,7 @@ const {
   buyMinerSpeedUpgrade,
   buyMinerRadiusUpgrade,
   buyOvertimeUpgrade,
-  toggleMinerRepositionMode,
+  toggleMinerRepositionMode: toggleMinerRepositionModeBase,
   buyDoubleActivationMin,
   buyDoubleActivationMax,
   buyVeinFinderUpgrade,
@@ -1153,6 +1536,45 @@ const {
   canUpgradeEnrichChance,
 });
 
+function toggleMinerRepositionMode(): void {
+  const isMobile = isMobileViewport();
+  if (isMobile) {
+    const minerIndex = interactionState.selectedMinerIndex ?? activeRepositionMinerIndex;
+    if (minerIndex === null || minerIndex < 0 || minerIndex >= state.idleMinerOwned) {
+      return;
+    }
+
+    interactionState.selectedMinerIndex = minerIndex;
+    interactionState.placementMode = true;
+    activeRepositionMinerIndex = minerIndex;
+    const currentPosition = getMinerPosition(minerIndex);
+    placementOriginalPosition = { x: currentPosition.x, y: currentPosition.y };
+    placementCandidateSet = false;
+    repositionWorkerModalOpen = false;
+
+    keepWorkerSelectionOnWorkersClose = true;
+    setWorkersModalOpen(false);
+    setStatus("Tap the map to place the worker, then Confirm or Cancel.");
+    render();
+    return;
+  }
+
+  const wasPlacementMode = interactionState.placementMode;
+  toggleMinerRepositionModeBase();
+  const minerIndex = interactionState.selectedMinerIndex;
+
+  if (!wasPlacementMode && interactionState.placementMode && minerIndex !== null) {
+    activeRepositionMinerIndex = minerIndex;
+    const currentPosition = getMinerPosition(minerIndex);
+    placementOriginalPosition = { x: currentPosition.x, y: currentPosition.y };
+    placementCandidateSet = false;
+  } else if (wasPlacementMode && !interactionState.placementMode) {
+    activeRepositionMinerIndex = null;
+    placementOriginalPosition = null;
+    placementCandidateSet = false;
+  }
+}
+
 const {
   buyIdleMiner,
   resetGame,
@@ -1169,6 +1591,7 @@ const {
   buyAmethystGeneration,
 } = createGameActions({
   state,
+  maxMapSize: MAX_MAP_SIZE,
   saveKey: SAVE_KEY,
   clearSavedGame,
   createDefaultResources,
@@ -1190,12 +1613,18 @@ const {
 function renderMap(): void {
   if (!ui.mapGrid) return;
   const mapSize = getMapSize();
+  syncMapScaleToContainer(mapSize);
+
+  ui.mapGrid.style.gridTemplateColumns = `repeat(${mapSize}, ${TILE_SIZE_PX}px)`;
+  ui.mapGrid.style.gap = `${TILE_GAP_PX}px`;
+  ui.mapGrid.style.setProperty("--tile-size", `${TILE_SIZE_PX}px`);
+  ui.mapGrid.style.setProperty("--tile-gap", `${TILE_GAP_PX}px`);
+
   if (state.lastRenderedMapSize === mapSize) {
     return;
   }
 
   const tileCount = mapSize * mapSize;
-  ui.mapGrid.style.gridTemplateColumns = `repeat(${mapSize}, 38px)`;
   ui.mapGrid.innerHTML = "";
 
   for (let index = 0; index < tileCount; index += 1) {
@@ -1211,12 +1640,49 @@ function renderMap(): void {
   state.lastRenderedMapSize = mapSize;
 }
 
+function syncMapScaleToContainer(mapSize: number): void {
+  const mapContainer = ui.mapEnvironment ?? ui.mapGrid;
+  if (!mapContainer) {
+    return;
+  }
+
+  const availableWidthPx = Math.max(0, Math.floor(mapContainer.clientWidth) - 2);
+  const availableHeightPx = Math.max(0, Math.floor(mapContainer.clientHeight) - 2);
+  const isMobileLayout = window.innerWidth <= MOBILE_BREAKPOINT_PX;
+  const fitConstraintPx = isMobileLayout
+    ? Math.min(availableWidthPx, availableHeightPx || availableWidthPx)
+    : availableWidthPx;
+  if (!Number.isFinite(fitConstraintPx) || fitConstraintPx <= 0) {
+    return;
+  }
+
+  const baseMapWidthPx = getMapPixelSizeAtScale(mapSize, VIEWPORT_MAP_SCALE);
+  if (baseMapWidthPx <= 0) {
+    applyMapScale(VIEWPORT_MAP_SCALE);
+    return;
+  }
+
+  const fitRatio = Math.min(1, fitConstraintPx / baseMapWidthPx);
+  applyMapScale(VIEWPORT_MAP_SCALE * fitRatio);
+
+  let fittedMapWidth = getMapPixelSize(mapSize);
+  let attempts = 0;
+  while (fittedMapWidth > fitConstraintPx && attempts < 4) {
+    const correctionRatio = fitConstraintPx / Math.max(1, fittedMapWidth);
+    applyMapScale(MAP_SCALE * correctionRatio * 0.995);
+    fittedMapWidth = getMapPixelSize(mapSize);
+    attempts += 1;
+  }
+}
+
 function renderMinerRing(): void {
   if (!ui.minerRing) return;
   ui.minerRing.innerHTML = "";
   if (state.idleMinerOwned <= 0) {
     return;
   }
+
+  const repositionMinerIndex = interactionState.placementMode ? getCurrentRepositionMinerIndex() : null;
 
   for (let index = 0; index < state.idleMinerOwned; index += 1) {
     const { x, y } = getMinerPosition(index);
@@ -1225,6 +1691,9 @@ function renderMinerRing(): void {
     minerNode.className = "miner-node";
     if (interactionState.activeMinerIndex === index) {
       minerNode.classList.add("dragging");
+    }
+    if (repositionMinerIndex === index) {
+      minerNode.classList.add("reposition-selected");
     }
     minerNode.dataset.minerIndex = index.toString();
     minerNode.style.setProperty("--miner-radius", `${getMinerEffectRadiusPx(index)}px`);
@@ -1236,10 +1705,10 @@ function renderMinerRing(): void {
 }
 
 function moveMinerToPointer(clientX: number, clientY: number): void {
-  if (!interactionState.placementMode || interactionState.selectedMinerIndex === null || !ui.mapEnvironment) {
+  const minerIndex = interactionState.selectedMinerIndex ?? activeRepositionMinerIndex;
+  if (!interactionState.placementMode || minerIndex === null || !ui.mapEnvironment) {
     return;
   }
-  const minerIndex = interactionState.selectedMinerIndex;
 
   const bounds = ui.mapEnvironment.getBoundingClientRect();
   const centerX = bounds.left + bounds.width / 2;
@@ -1251,7 +1720,54 @@ function moveMinerToPointer(clientX: number, clientY: number): void {
   const y = clamp(clientY - centerY, -maxY, maxY);
 
   state.idleMinerPositions[minerIndex] = { x, y };
+  placementCandidateSet = true;
   renderMinerRing();
+}
+
+function confirmMinerPlacement(): void {
+  const minerIndex = interactionState.selectedMinerIndex ?? activeRepositionMinerIndex;
+  if (!interactionState.placementMode || minerIndex === null) {
+    return;
+  }
+
+  if (!placementCandidateSet && placementOriginalPosition) {
+    state.idleMinerPositions[minerIndex] = {
+      x: placementOriginalPosition.x,
+      y: placementOriginalPosition.y,
+    };
+  }
+
+  interactionState.placementMode = false;
+  interactionState.selectedMinerIndex = minerIndex;
+  activeRepositionMinerIndex = null;
+  placementOriginalPosition = null;
+  placementCandidateSet = false;
+  repositionWorkerModalOpen = false;
+  setStatus("Worker repositioned.");
+  render();
+}
+
+function cancelMinerPlacement(): void {
+  const minerIndex = interactionState.selectedMinerIndex ?? activeRepositionMinerIndex;
+  if (!interactionState.placementMode || minerIndex === null) {
+    return;
+  }
+
+  if (placementOriginalPosition) {
+    state.idleMinerPositions[minerIndex] = {
+      x: placementOriginalPosition.x,
+      y: placementOriginalPosition.y,
+    };
+  }
+
+  interactionState.placementMode = false;
+  interactionState.selectedMinerIndex = minerIndex;
+  activeRepositionMinerIndex = null;
+  placementOriginalPosition = null;
+  placementCandidateSet = false;
+  repositionWorkerModalOpen = false;
+  setStatus("Reposition canceled.");
+  render();
 }
 
 function renderMinerPopup(): void {
@@ -1509,11 +2025,8 @@ function renderMinerStatsPanel(): void {
       title: "",
       positionText: "",
       rateText: "",
-      cooldownText: "",
       radiusText: "",
-      speedLevel: 0,
-      radiusLevel: 0,
-      doubleActivationRangeText: "",
+      classStatRows: [],
     });
     return;
   }
@@ -1521,21 +2034,57 @@ function renderMinerStatsPanel(): void {
   const upgrade = getMinerUpgrade(minerIndex);
   const position = getMinerPosition(minerIndex);
   const clicksPerSecond = getMinerClicksPerSecond(minerIndex);
-  const cooldownSeconds = getMinerCooldownSeconds(minerIndex);
   const radiusPx = getMinerEffectRadiusPx(minerIndex);
-  const minPercent = Math.round(getDoubleActivationMinPercent(minerIndex) * 100);
-  const maxPercent = Math.round(getDoubleActivationMaxPercent(minerIndex) * 100);
+  const classStatRows: Array<{ label: string; value: string }> = [];
+
+  if (upgrade.specialization === "Multi Activator") {
+    classStatRows.push({
+      label: "Multi Activation Range",
+      value: `${Math.round(getDoubleActivationMinPercent(minerIndex) * 100)}%-${Math.round(getDoubleActivationMaxPercent(minerIndex) * 100)}%`,
+    });
+  }
+
+  if (upgrade.specialization === "Crit Build") {
+    classStatRows.push({ label: "Crit Chance", value: `${Math.round(getCritChance(minerIndex) * 100)}%` });
+    classStatRows.push({ label: "Crit Multiplier", value: `${getCritMultiplier(minerIndex).toFixed(1)}x` });
+  }
+
+  if (upgrade.specialization === "Chain Lightning") {
+    classStatRows.push({ label: "Chain Chance", value: `${Math.round(getChainReactionChance(minerIndex) * 100)}%` });
+    classStatRows.push({ label: "Chain Length", value: `${getChainReactionLength(minerIndex)}` });
+    classStatRows.push({ label: "Metal Bias", value: `${Math.round(getChainMetalBiasChance(minerIndex) * 100)}%` });
+    classStatRows.push({ label: "Elec. Efficiency", value: `${Math.round(getElectricEfficiencyChance(minerIndex) * 100)}%` });
+  }
+
+  if (upgrade.specialization === "Prospector") {
+    classStatRows.push({ label: "Vein Finder", value: `+${Math.round((getVeinFinderQualityMultiplier(minerIndex) - 1) * 100)}%` });
+  }
+
+  if (upgrade.specialization === "Arcanist") {
+    classStatRows.push({ label: "Bountiful Chance", value: `${Math.round(getEnchantBountifulChance(minerIndex) * 100)}%` });
+    classStatRows.push({ label: "Bountiful Min", value: `${getEnchantBountifulMinMultiplier(minerIndex).toFixed(2)}x` });
+    classStatRows.push({ label: "Bountiful Max", value: `${getEnchantBountifulMaxMultiplier(minerIndex).toFixed(2)}x` });
+  }
+
+  if (upgrade.specialization === "Enricher") {
+    classStatRows.push({ label: "Enrich Chance", value: `${Math.round(getEnrichChance(minerIndex) * 100)}%` });
+    classStatRows.push({ label: "Enrich Min", value: `${getEnrichMinMultiplier(minerIndex).toFixed(2)}x` });
+    classStatRows.push({ label: "Enrich Max", value: `${getEnrichMaxMultiplier(minerIndex).toFixed(2)}x` });
+  }
+
+  if (upgrade.specialization === "Foreman") {
+    classStatRows.push({ label: "Overtime Aura", value: `+${Math.round((getForemanOvertimeMultiplier(minerIndex) - 1) * 100)}%` });
+    classStatRows.push({ label: "Motivation", value: `+${upgrade.speedLevel * 2}%` });
+    classStatRows.push({ label: "Autonomy", value: `+${upgrade.radiusLevel * 2}%` });
+  }
 
   renderMinerStatsPanelView(ui, {
     isVisible: interactionState.statsPanelOpen,
     title: `${getMinerDisplayName(minerIndex)} Stats`,
     positionText: `${Math.round(position.x)}, ${Math.round(position.y)}`,
     rateText: `${clicksPerSecond.toFixed(2)} act/sec`,
-    cooldownText: `${cooldownSeconds.toFixed(2)}s`,
     radiusText: `${Math.round(radiusPx)}px`,
-    speedLevel: upgrade.speedLevel,
-    radiusLevel: upgrade.radiusLevel,
-    doubleActivationRangeText: `${minPercent}%-${maxPercent}%`,
+    classStatRows,
   });
 }
 
@@ -1557,6 +2106,15 @@ function runIdleMiners(deltaSeconds: number): void {
 }
 
 function renderNow(): void {
+  if (isMobileViewport() && activeRepositionMinerIndex !== null) {
+    if (!interactionState.placementMode) {
+      interactionState.placementMode = true;
+    }
+    if (interactionState.selectedMinerIndex !== activeRepositionMinerIndex) {
+      interactionState.selectedMinerIndex = activeRepositionMinerIndex;
+    }
+  }
+
   if (flushInventory()) {
     markAllInventoryDirty();
   }
@@ -1621,9 +2179,13 @@ function renderNow(): void {
   if (ui.idleMinerOwned) ui.idleMinerOwned.textContent = state.idleMinerOwned.toString();
   if (ui.buyIdleMiner) ui.buyIdleMiner.disabled = !canAfford(idleMinerCost);
   if (ui.mapExpandCost) ui.mapExpandCost.textContent = mapCost.toLocaleString();
-  if (ui.mapExpansions) ui.mapExpansions.textContent = state.mapExpansions.toString();
+  if (ui.mapExpansions) ui.mapExpansions.textContent = `${mapSize}x${mapSize}`;
   if (ui.mapSize) ui.mapSize.textContent = `${mapSize}x${mapSize}`;
-  if (ui.expandMap) ui.expandMap.disabled = !canAfford(mapCost);
+  if (ui.expandMap) {
+    const canExpandMap = mapSize < MAX_MAP_SIZE;
+    ui.expandMap.classList.toggle("hidden", !canExpandMap);
+    ui.expandMap.disabled = !canExpandMap || !canAfford(mapCost);
+  }
   if (ui.coalGenerationCost) ui.coalGenerationCost.textContent = coalCost.toLocaleString();
   if (ui.coalGenerationLevel) ui.coalGenerationLevel.textContent = getOreGenerationLevel("coal").toString();
   if (ui.coalGenerationStat) ui.coalGenerationStat.textContent = getOreGenerationStatText("coal");
@@ -1674,6 +2236,66 @@ function renderNow(): void {
   if (ui.gemstoneGenerationStat) ui.gemstoneGenerationStat.textContent = getGemstoneGenerationStatText();
   if (ui.sellAllResources) ui.sellAllResources.disabled = totalInventory <= 0;
   renderInventoryAutoSellToggle();
+  renderAccessabilitySettings();
+  document.body.classList.toggle("placement-mode", interactionState.placementMode);
+
+  if (ui.mobileRepositionControls && ui.mobileRepositionPrompt) {
+    const promptMinerIndex = interactionState.selectedMinerIndex ?? activeRepositionMinerIndex;
+    const showMobilePrompt =
+      isMobileViewport() &&
+      interactionState.placementMode &&
+      promptMinerIndex !== null &&
+      promptMinerIndex >= 0 &&
+      promptMinerIndex < state.idleMinerOwned;
+
+    ui.mobileRepositionControls.classList.toggle("hidden", !showMobilePrompt);
+    if (showMobilePrompt) {
+      ui.mobileRepositionPrompt.textContent = `Moving: ${getMinerDisplayName(promptMinerIndex!)}. Drag or tap map to place, or switch worker below.`;
+    }
+
+    if (ui.repositionPrevWorkerButton) {
+      ui.repositionPrevWorkerButton.disabled = !showMobilePrompt || state.idleMinerOwned <= 1;
+    }
+    if (ui.repositionNextWorkerButton) {
+      ui.repositionNextWorkerButton.disabled = !showMobilePrompt || state.idleMinerOwned <= 1;
+    }
+    if (ui.repositionSelectWorkerButton) {
+      ui.repositionSelectWorkerButton.disabled = !showMobilePrompt || state.idleMinerOwned <= 0;
+      ui.repositionSelectWorkerButton.textContent = "Select Worker";
+    }
+  }
+
+  if (ui.repositionWorkerModal && ui.repositionWorkerModalList) {
+    const shouldShowWorkerModal = isMobileViewport() && repositionWorkerModalOpen;
+    ui.repositionWorkerModal.classList.toggle("hidden", !shouldShowWorkerModal);
+    ui.repositionWorkerModal.setAttribute("aria-hidden", String(!shouldShowWorkerModal));
+
+    if (shouldShowWorkerModal) {
+      ui.repositionWorkerModalList.innerHTML = "";
+      const optionCount = Math.min(state.idleMinerOwned, 9);
+      for (let workerIndex = 0; workerIndex < optionCount; workerIndex += 1) {
+        const optionButton = document.createElement("button");
+        optionButton.type = "button";
+        optionButton.className = "reposition-worker-option";
+        optionButton.dataset.workerIndex = workerIndex.toString();
+        optionButton.textContent = getMinerDisplayName(workerIndex);
+        ui.repositionWorkerModalList.appendChild(optionButton);
+      }
+    }
+  }
+  if (ui.confirmRepositionButton) {
+    ui.confirmRepositionButton.disabled = false;
+  }
+
+  const isWorkersModalOpen = !!ui.workersModal && !ui.workersModal.classList.contains("hidden");
+  if (isWorkersModalOpen) {
+    if (!isMobileViewport()) {
+      setWorkersModalOpen(false);
+    } else {
+      attachMinerPanelsToWorkersHost();
+      renderWorkersList();
+    }
+  }
 
   renderMap();
   renderUpgradesAccordion();
@@ -1711,11 +2333,16 @@ bindUiEvents({
   state,
   interactionState,
   setSettingsModalOpen,
+  setWorkersModalOpen,
   closeMinerPanels,
   closeResourceStatsPanel,
   setClassModalOpen,
   setInventoryModalOpen,
+  setUpgradesModalOpen,
   toggleInventoryAutoSell,
+  toggleLeftHandedMode,
+  openWorkersPanel,
+  selectWorkerFromList,
   activateTile: (tile) => {
     activateTile(tile);
   },
@@ -1764,8 +2391,72 @@ bindUiEvents({
   selectMinerSpecialization,
   setMinerTargeting,
   saveGame,
+  addCoinsCheat,
   resetGame,
 });
+
+if (ui.confirmRepositionButton) {
+  ui.confirmRepositionButton.addEventListener("click", confirmMinerPlacement);
+}
+
+if (ui.cancelRepositionButton) {
+  ui.cancelRepositionButton.addEventListener("click", cancelMinerPlacement);
+}
+
+if (ui.repositionPrevWorkerButton) {
+  ui.repositionPrevWorkerButton.addEventListener("click", selectPreviousRepositionWorker);
+}
+
+if (ui.repositionNextWorkerButton) {
+  ui.repositionNextWorkerButton.addEventListener("click", selectNextRepositionWorker);
+}
+
+if (ui.repositionSelectWorkerButton) {
+  ui.repositionSelectWorkerButton.addEventListener("click", toggleRepositionWorkerPicker);
+}
+
+if (ui.repositionWorkerModalList) {
+  ui.repositionWorkerModalList.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const workerButton = target.closest(".reposition-worker-option") as HTMLButtonElement | null;
+    if (!(workerButton instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const workerIndex = Number(workerButton.dataset.workerIndex);
+    if (!Number.isInteger(workerIndex)) {
+      return;
+    }
+
+    setRepositionTargetWorker(workerIndex);
+  });
+}
+
+if (ui.closeRepositionWorkerModalButton) {
+  ui.closeRepositionWorkerModalButton.addEventListener("click", () => {
+    repositionWorkerModalOpen = false;
+    render();
+  });
+}
+
+if (ui.repositionWorkerModal) {
+  ui.repositionWorkerModal.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (target.closest(".modal-card")) {
+      return;
+    }
+
+    repositionWorkerModalOpen = false;
+    render();
+  });
+}
 
 loadGame();
 state.lastTick = Date.now();

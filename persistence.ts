@@ -15,6 +15,7 @@ export function saveGameState(saveKey: string, state: GameState, storage: Storag
       coins: state.coins,
       activePlaySeconds: state.activePlaySeconds,
       autoSellEnabled: state.autoSellEnabled,
+      leftHandedMode: state.leftHandedMode,
       idleMinerOwned: state.idleMinerOwned,
       idleMinerCooldowns: state.idleMinerCooldowns,
       idleMinerPositions: state.idleMinerPositions,
@@ -49,6 +50,7 @@ export function loadGameState(
     state.coins = Number(parsed.coins) || 0;
     state.activePlaySeconds = Math.max(0, Number(parsed.activePlaySeconds) || 0);
     state.autoSellEnabled = Boolean(parsed.autoSellEnabled);
+    state.leftHandedMode = Boolean(parsed.leftHandedMode);
     state.idleMinerOwned = Number(parsed.idleMinerOwned) || 0;
 
     state.idleMinerCooldowns = Array.isArray(parsed.idleMinerCooldowns)
