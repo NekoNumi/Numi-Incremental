@@ -1901,16 +1901,13 @@ function renderMap(): void {
   const mapSize = getMapSize();
   const mapContainer = ui.mapEnvironment ?? ui.mapGrid;
   const containerWidth = mapContainer?.clientWidth ?? 0;
-  const containerHeight = mapContainer?.clientHeight ?? 0;
   const shouldSyncScale =
     state.lastRenderedMapSize !== mapSize ||
-    state.lastMapContainerWidth !== containerWidth ||
-    state.lastMapContainerHeight !== containerHeight;
+    state.lastMapContainerWidth !== containerWidth;
 
   if (shouldSyncScale) {
     syncMapScaleToContainer(mapSize);
     state.lastMapContainerWidth = containerWidth;
-    state.lastMapContainerHeight = containerHeight;
   }
 
   const tileLayoutChanged =
@@ -2846,18 +2843,15 @@ if (window.visualViewport) {
 const mapScaleContainer = ui.mapEnvironment ?? ui.mapGrid;
 if (mapScaleContainer && typeof ResizeObserver !== "undefined") {
   let lastObservedWidth = Math.round(mapScaleContainer.clientWidth);
-  let lastObservedHeight = Math.round(mapScaleContainer.clientHeight);
 
   const mapContainerResizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const observedWidth = Math.round(entry.contentRect.width);
-      const observedHeight = Math.round(entry.contentRect.height);
-      if (observedWidth === lastObservedWidth && observedHeight === lastObservedHeight) {
+      if (observedWidth === lastObservedWidth) {
         continue;
       }
 
       lastObservedWidth = observedWidth;
-      lastObservedHeight = observedHeight;
       handleViewportResize();
     }
   });
