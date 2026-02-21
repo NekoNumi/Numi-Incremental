@@ -283,6 +283,10 @@ const state: GameState = {
   inventory: createEmptyInventory(),
   lastTick: Date.now(),
   lastRenderedMapSize: 0,
+  lastRenderedTileSizePx: 0,
+  lastRenderedTileGapPx: 0,
+  lastMapContainerWidth: 0,
+  lastMapContainerHeight: 0,
   idleMinerCooldowns: [],
   idleMinerPositions: [],
   units: [],
@@ -1887,12 +1891,33 @@ const {
 function renderMap(): void {
   if (!ui.mapGrid) return;
   const mapSize = getMapSize();
-  syncMapScaleToContainer(mapSize);
+  const mapContainer = ui.mapEnvironment ?? ui.mapGrid;
+  const containerWidth = mapContainer?.clientWidth ?? 0;
+  const containerHeight = mapContainer?.clientHeight ?? 0;
+  const shouldSyncScale =
+    state.lastRenderedMapSize !== mapSize ||
+    state.lastMapContainerWidth !== containerWidth ||
+    state.lastMapContainerHeight !== containerHeight;
 
-  ui.mapGrid.style.gridTemplateColumns = `repeat(${mapSize}, ${TILE_SIZE_PX}px)`;
-  ui.mapGrid.style.gap = `${TILE_GAP_PX}px`;
-  ui.mapGrid.style.setProperty("--tile-size", `${TILE_SIZE_PX}px`);
-  ui.mapGrid.style.setProperty("--tile-gap", `${TILE_GAP_PX}px`);
+  if (shouldSyncScale) {
+    syncMapScaleToContainer(mapSize);
+    state.lastMapContainerWidth = containerWidth;
+    state.lastMapContainerHeight = containerHeight;
+  }
+
+  const tileLayoutChanged =
+    state.lastRenderedMapSize !== mapSize ||
+    state.lastRenderedTileSizePx !== TILE_SIZE_PX ||
+    state.lastRenderedTileGapPx !== TILE_GAP_PX;
+
+  if (tileLayoutChanged) {
+    ui.mapGrid.style.gridTemplateColumns = `repeat(${mapSize}, ${TILE_SIZE_PX}px)`;
+    ui.mapGrid.style.gap = `${TILE_GAP_PX}px`;
+    ui.mapGrid.style.setProperty("--tile-size", `${TILE_SIZE_PX}px`);
+    ui.mapGrid.style.setProperty("--tile-gap", `${TILE_GAP_PX}px`);
+    state.lastRenderedTileSizePx = TILE_SIZE_PX;
+    state.lastRenderedTileGapPx = TILE_GAP_PX;
+  }
 
   if (state.lastRenderedMapSize === mapSize) {
     return;
@@ -2610,6 +2635,14 @@ function render(): void {
   requestRender();
 }
 
+function handleViewportResize(): void {
+  state.lastMapContainerWidth = 0;
+  state.lastMapContainerHeight = 0;
+  state.lastRenderedTileSizePx = 0;
+  state.lastRenderedTileGapPx = 0;
+  requestRender();
+}
+
 function gameLoop(): void {
   const now = Date.now();
   const deltaSeconds = (now - state.lastTick) / 1000;
@@ -2799,6 +2832,9 @@ if (ui.checkForUpdates) {
 
 renderDevLogEntries();
 setUpdateButtonText();
+
+window.addEventListener("resize", handleViewportResize);
+window.addEventListener("orientationchange", handleViewportResize);
 
 loadGame();
 state.lastTick = Date.now();
