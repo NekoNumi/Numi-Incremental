@@ -2570,5 +2570,11 @@ loadGame();
 state.lastTick = Date.now();
 renderNow();
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
 setInterval(gameLoop, 100);
 setInterval(() => saveGame(false), 10000);

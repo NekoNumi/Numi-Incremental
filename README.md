@@ -49,6 +49,15 @@ After deployment completes, your game will be available at:
 
 - `https://<your-username>.github.io/<your-repo-name>/`
 
+## Install on phone (PWA)
+
+After the site is deployed, you can install it like an app.
+
+- iPhone (Safari): Open your game URL → Share → Add to Home Screen.
+- Android (Chrome): Open your game URL → menu (⋮) → Install app (or Add to Home screen).
+
+The app uses standalone display mode, so it opens without normal browser navigation bars.
+
 ## Next ideas
 
 - Add more upgrade tiers

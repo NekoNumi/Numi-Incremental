@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">Numi's Idle Icon</title>
+  <desc id="desc">A dark square icon with N lettermark</desc>
+  <rect width="192" height="192" rx="40" fill="#10141f"/>
+  <rect x="18" y="18" width="156" height="156" rx="30" fill="#1b2233" stroke="#2b3550" stroke-width="6"/>
+  <path d="M54 132V60h18l40 48V60h26v72h-18L80 84v48H54z" fill="#f2f5ff"/>
+</svg>
