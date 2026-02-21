@@ -18,6 +18,7 @@ interface UiRefs {
   mapEnvironment: HTMLElement | null;
   popupUpgradeSpeed: HTMLButtonElement | null;
   popupUpgradeRadius: HTMLButtonElement | null;
+  popupUpgradeOvertime: HTMLButtonElement | null;
   popupReposition: HTMLButtonElement | null;
   closeMinerPopupButton: HTMLButtonElement | null;
   closeMinerStatsButton: HTMLButtonElement | null;
@@ -56,6 +57,7 @@ interface UiRefs {
   popupUpgradeEnrichChance: HTMLButtonElement | null;
   popupUnlockClass: HTMLButtonElement | null;
   popupChooseClass: HTMLButtonElement | null;
+  classPickForeman: HTMLButtonElement | null;
   classPickVeinFinder: HTMLButtonElement | null;
   classPickCrit: HTMLButtonElement | null;
   classPickChainLightning: HTMLButtonElement | null;
@@ -87,6 +89,7 @@ interface BindUiEventsArgs {
   render: () => void;
   buyMinerSpeedUpgrade: () => void;
   buyMinerRadiusUpgrade: () => void;
+  buyOvertimeUpgrade: () => void;
   toggleMinerRepositionMode: () => void;
   closeMinerUpgradePanel: () => void;
   closeMinerStatsPanel: () => void;
@@ -146,6 +149,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
     render,
     buyMinerSpeedUpgrade,
     buyMinerRadiusUpgrade,
+    buyOvertimeUpgrade,
     toggleMinerRepositionMode,
     closeMinerUpgradePanel,
     closeMinerStatsPanel,
@@ -313,6 +317,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
 
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.addEventListener("click", buyMinerSpeedUpgrade);
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.addEventListener("click", buyMinerRadiusUpgrade);
+  if (ui.popupUpgradeOvertime) ui.popupUpgradeOvertime.addEventListener("click", buyOvertimeUpgrade);
   if (ui.popupReposition) ui.popupReposition.addEventListener("click", toggleMinerRepositionMode);
   if (ui.closeMinerPopupButton) ui.closeMinerPopupButton.addEventListener("click", closeMinerUpgradePanel);
   if (ui.closeMinerStatsButton) ui.closeMinerStatsButton.addEventListener("click", closeMinerStatsPanel);
@@ -374,6 +379,7 @@ export function bindUiEvents(args: BindUiEventsArgs): void {
   if (ui.popupUpgradeEnrichChance) ui.popupUpgradeEnrichChance.addEventListener("click", buyEnrichChanceUpgrade);
   if (ui.popupUnlockClass) ui.popupUnlockClass.addEventListener("click", unlockClassChoice);
   if (ui.popupChooseClass) ui.popupChooseClass.addEventListener("click", () => setClassModalOpen(true));
+  if (ui.classPickForeman) ui.classPickForeman.addEventListener("click", () => selectMinerSpecialization("Foreman"));
   if (ui.classPickVeinFinder) ui.classPickVeinFinder.addEventListener("click", () => selectMinerSpecialization("Prospector"));
   if (ui.classPickCrit) ui.classPickCrit.addEventListener("click", () => selectMinerSpecialization("Crit Build"));
   if (ui.classPickChainLightning) ui.classPickChainLightning.addEventListener("click", () => selectMinerSpecialization("Chain Lightning"));

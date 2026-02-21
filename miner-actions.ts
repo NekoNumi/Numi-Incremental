@@ -9,10 +9,15 @@ interface CreateMinerActionsArgs {
   state: GameState;
   interactionState: MinerActionsInteractionState;
   canAfford: (cost: number) => boolean;
-  canUseClass: (minerIndex: number, spec: "Multi Activator" | "Prospector" | "Crit Build" | "Chain Lightning" | "Arcanist" | "Enricher") => boolean;
+  canUseClass: (
+    minerIndex: number,
+    spec: "Multi Activator" | "Prospector" | "Crit Build" | "Chain Lightning" | "Arcanist" | "Enricher" | "Foreman"
+  ) => boolean;
   render: () => void;
   getMinerSpeedUpgradeCost: (minerIndex: number) => number;
   getMinerRadiusUpgradeCost: (minerIndex: number) => number;
+  getOvertimeCost: (minerIndex: number) => number;
+  canUpgradeOvertime: (minerIndex: number) => boolean;
   getMinerCooldownSeconds: (minerIndex: number) => number;
   getDoubleActivationMinCost: (minerIndex: number) => number;
   getDoubleActivationMaxCost: (minerIndex: number) => number;
@@ -38,6 +43,7 @@ interface CreateMinerActionsArgs {
 export function createMinerActions(args: CreateMinerActionsArgs): {
   buyMinerSpeedUpgrade: () => void;
   buyMinerRadiusUpgrade: () => void;
+  buyOvertimeUpgrade: () => void;
   toggleMinerRepositionMode: () => void;
   buyDoubleActivationMin: () => void;
   buyDoubleActivationMax: () => void;
@@ -62,6 +68,8 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
     render,
     getMinerSpeedUpgradeCost,
     getMinerRadiusUpgradeCost,
+    getOvertimeCost,
+    canUpgradeOvertime,
     getMinerCooldownSeconds,
     getDoubleActivationMinCost,
     getDoubleActivationMaxCost,
@@ -121,6 +129,25 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
 
     state.coins -= cost;
     state.units[minerIndex].radiusLevel += 1;
+    render();
+  }
+
+  function buyOvertimeUpgrade(): void {
+    const minerIndex = interactionState.selectedMinerIndex;
+    if (minerIndex === null) return;
+    if (!canUseClass(minerIndex, "Foreman")) return;
+    if (!canUpgradeOvertime(minerIndex)) return;
+
+    const cost = getOvertimeCost(minerIndex);
+    if (!canAfford(cost)) {
+      return;
+    }
+
+    state.coins -= cost;
+    const data = state.units[minerIndex].specializationData;
+    if (data.type === "Foreman") {
+      data.overtimeLevel += 1;
+    }
     render();
   }
 
@@ -366,6 +393,7 @@ export function createMinerActions(args: CreateMinerActionsArgs): {
   return {
     buyMinerSpeedUpgrade,
     buyMinerRadiusUpgrade,
+    buyOvertimeUpgrade,
     toggleMinerRepositionMode,
     buyDoubleActivationMin,
     buyDoubleActivationMax,

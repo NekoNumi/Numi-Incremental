@@ -88,10 +88,16 @@ interface UIElements {
   minerPopupTitle: HTMLElement | null;
   popupUpgradeSpeed: HTMLButtonElement | null;
   popupUpgradeRadius: HTMLButtonElement | null;
+  popupSpeedLabel: HTMLElement | null;
+  popupRadiusLabel: HTMLElement | null;
   popupSpeedCost: HTMLElement | null;
   popupRadiusCost: HTMLElement | null;
   popupSpeedLevel: HTMLElement | null;
   popupRadiusLevel: HTMLElement | null;
+  popupUpgradeOvertime: HTMLButtonElement | null;
+  popupOvertimeCost: HTMLElement | null;
+  popupOvertimeLevel: HTMLElement | null;
+  popupOvertimeStat: HTMLElement | null;
   popupReposition: HTMLButtonElement | null;
   coalGenerationCost: HTMLElement | null;
   coalGenerationLevel: HTMLElement | null;
@@ -203,6 +209,7 @@ interface UIElements {
   popupTargetingHigh: HTMLButtonElement | null;
   popupTargetingLow: HTMLButtonElement | null;
   classModal: HTMLElement | null;
+  classPickForeman: HTMLButtonElement | null;
   classPickVeinFinder: HTMLButtonElement | null;
   classPickCrit: HTMLButtonElement | null;
   classPickChainLightning: HTMLButtonElement | null;
@@ -306,6 +313,12 @@ const minerRadiusUpgrade: UpgradeConfig = {
   baseCost: 60,
   growth: 1.35,
   radiusBonusPerLevel: 0.25,
+};
+
+const overtimeUpgrade: UpgradeConfig = {
+  baseCost: 300,
+  growth: 1.35,
+  cappedMax: true,
 };
 
 state.resources = createDefaultResources();
@@ -420,10 +433,16 @@ const ui: UIElements = {
   minerPopupTitle: document.getElementById("miner-popup-title"),
   popupUpgradeSpeed: document.getElementById("popup-upgrade-speed") as HTMLButtonElement,
   popupUpgradeRadius: document.getElementById("popup-upgrade-radius") as HTMLButtonElement,
+  popupSpeedLabel: document.getElementById("popup-speed-label"),
+  popupRadiusLabel: document.getElementById("popup-radius-label"),
   popupSpeedCost: document.getElementById("popup-speed-cost"),
   popupRadiusCost: document.getElementById("popup-radius-cost"),
   popupSpeedLevel: document.getElementById("popup-speed-level"),
   popupRadiusLevel: document.getElementById("popup-radius-level"),
+  popupUpgradeOvertime: document.getElementById("popup-upgrade-overtime") as HTMLButtonElement,
+  popupOvertimeCost: document.getElementById("popup-overtime-cost"),
+  popupOvertimeLevel: document.getElementById("popup-overtime-level"),
+  popupOvertimeStat: document.getElementById("popup-overtime-stat"),
   popupSpeedStat: document.getElementById("popup-speed-stat"),
   popupRadiusStat: document.getElementById("popup-radius-stat"),
   popupReposition: document.getElementById("popup-reposition") as HTMLButtonElement,
@@ -535,6 +554,7 @@ const ui: UIElements = {
   popupTargetingHigh: document.getElementById("popup-targeting-high") as HTMLButtonElement,
   popupTargetingLow: document.getElementById("popup-targeting-low") as HTMLButtonElement,
   classModal: document.getElementById("class-modal"),
+  classPickForeman: document.getElementById("class-pick-foreman") as HTMLButtonElement,
   classPickVeinFinder: document.getElementById("class-pick-vein-finder") as HTMLButtonElement,
   classPickCrit: document.getElementById("class-pick-crit") as HTMLButtonElement,
   classPickChainLightning: document.getElementById("class-pick-chain-lightning") as HTMLButtonElement,
@@ -663,6 +683,8 @@ const {
   getMinerCooldownSeconds,
   getMinerSpeedUpgradeCost,
   getMinerRadiusUpgradeCost,
+  getOvertimeCost,
+  canUpgradeOvertime,
   getMinerEffectRadiusPx,
   getDoubleActivationMinCost,
   getDoubleActivationMaxCost,
@@ -689,6 +711,7 @@ const {
   getActivationCountFromRoll,
   getMinerSpeedStatText,
   getMinerRadiusStatText,
+  getOvertimeStatText,
   getDoubleActivationMinStatText,
   getDoubleActivationMaxStatText,
   getVeinFinderQualityMultiplier,
@@ -743,6 +766,7 @@ const {
   minerRadiusBonusPerLevel: minerRadiusUpgrade.radiusBonusPerLevel || 0.25,
   fasterMinerUpgrade,
   minerRadiusUpgrade,
+  overtimeUpgrade,
   doubleActivationMinUpgrade,
   doubleActivationMaxUpgrade,
   veinFinderUpgrade,
@@ -1081,6 +1105,7 @@ const { applyTileType, activateTile, triggerChainReaction } = createTileActions(
 const {
   buyMinerSpeedUpgrade,
   buyMinerRadiusUpgrade,
+  buyOvertimeUpgrade,
   toggleMinerRepositionMode,
   buyDoubleActivationMin,
   buyDoubleActivationMax,
@@ -1104,6 +1129,8 @@ const {
   render,
   getMinerSpeedUpgradeCost,
   getMinerRadiusUpgradeCost,
+  getOvertimeCost,
+  canUpgradeOvertime,
   getMinerCooldownSeconds,
   getDoubleActivationMinCost,
   getDoubleActivationMaxCost,
@@ -1235,6 +1262,7 @@ function renderMinerPopup(): void {
       title: "",
       speedLevel: 0,
       radiusLevel: 0,
+      overtimeLevel: 0,
       doubleActivationMinLevel: 0,
       doubleActivationMaxLevel: 0,
       veinFinderLevel: 0,
@@ -1251,6 +1279,7 @@ function renderMinerPopup(): void {
       enrichChanceLevel: 0,
       speedCost: 0,
       radiusCost: 0,
+      overtimeCost: 0,
       doubleActivationMinCost: 0,
       doubleActivationMaxCost: 0,
       veinFinderCost: 0,
@@ -1267,6 +1296,7 @@ function renderMinerPopup(): void {
       enrichChanceCost: 0,
       speedStat: "",
       radiusStat: "",
+      overtimeStat: "",
       doubleActivationMinStat: "",
       doubleActivationMaxStat: "",
       veinFinderStat: "",
@@ -1297,8 +1327,10 @@ function renderMinerPopup(): void {
       showEnchantBountiful: false,
       showEnricher: false,
       showEnrichChance: false,
+      showForeman: false,
       canBuySpeed: false,
       canBuyRadius: false,
+      canBuyOvertime: false,
       canBuyDoubleActivationMin: false,
       canBuyDoubleActivationMax: false,
       canBuyVeinFinder: false,
@@ -1321,6 +1353,7 @@ function renderMinerPopup(): void {
   const upgrade = getMinerUpgrade(minerIndex);
   const speedCost = getMinerSpeedUpgradeCost(minerIndex);
   const radiusCost = getMinerRadiusUpgradeCost(minerIndex);
+  const overtimeCost = getOvertimeCost(minerIndex);
   const doubleActivationMinCost = getDoubleActivationMinCost(minerIndex);
   const doubleActivationMaxCost = getDoubleActivationMaxCost(minerIndex);
   const veinFinderCost = getVeinFinderCost(minerIndex);
@@ -1352,12 +1385,21 @@ function renderMinerPopup(): void {
     showArcanist && canOfferUpgrade(enchantBountifulUpgrade, canUpgradeEnchantBountifulChance(minerIndex));
   const showEnricher = selectedSpec === "Enricher";
   const showEnrichChance = showEnricher && canOfferUpgrade(enrichChanceUpgrade, canUpgradeEnrichChance(minerIndex));
+  const showForeman = selectedSpec === "Foreman" && canOfferUpgrade(overtimeUpgrade, canUpgradeOvertime(minerIndex));
   const multiData = upgrade.specializationData.type === "Multi Activator" ? upgrade.specializationData : null;
   const prospectorData = upgrade.specializationData.type === "Prospector" ? upgrade.specializationData : null;
   const critData = upgrade.specializationData.type === "Crit Build" ? upgrade.specializationData : null;
   const chainData = upgrade.specializationData.type === "Chain Lightning" ? upgrade.specializationData : null;
+  const foremanData = upgrade.specializationData.type === "Foreman" ? upgrade.specializationData : null;
   const arcanistData = upgrade.specializationData.type === "Arcanist" ? upgrade.specializationData : null;
   const enricherData = upgrade.specializationData.type === "Enricher" ? upgrade.specializationData : null;
+
+  if (ui.popupSpeedLabel) {
+    ui.popupSpeedLabel.textContent = selectedSpec === "Foreman" ? "Motivation" : "Faster Miner";
+  }
+  if (ui.popupRadiusLabel) {
+    ui.popupRadiusLabel.textContent = selectedSpec === "Foreman" ? "Autonomy" : "Wider Mining Radius";
+  }
 
   const specStatus = selectedSpec !== "Worker"
     ? `Specialization: ${getSpecializationLabel(selectedSpec)}`
@@ -1372,6 +1414,7 @@ function renderMinerPopup(): void {
     title: getMinerDisplayName(minerIndex),
     speedLevel: upgrade.speedLevel,
     radiusLevel: upgrade.radiusLevel,
+    overtimeLevel: foremanData?.overtimeLevel ?? 0,
     doubleActivationMinLevel: multiData?.multiActivationMinLevel ?? 0,
     doubleActivationMaxLevel: multiData?.multiActivationMaxLevel ?? 0,
     veinFinderLevel: prospectorData?.veinFinderLevel ?? 0,
@@ -1388,6 +1431,7 @@ function renderMinerPopup(): void {
     enrichChanceLevel: enricherData?.enrichChanceLevel ?? 0,
     speedCost,
     radiusCost,
+    overtimeCost,
     doubleActivationMinCost,
     doubleActivationMaxCost,
     veinFinderCost,
@@ -1404,6 +1448,7 @@ function renderMinerPopup(): void {
     enrichChanceCost,
     speedStat: getMinerSpeedStatText(minerIndex),
     radiusStat: getMinerRadiusStatText(minerIndex),
+    overtimeStat: getOvertimeStatText(minerIndex),
     doubleActivationMinStat: getDoubleActivationMinStatText(minerIndex),
     doubleActivationMaxStat: getDoubleActivationMaxStatText(minerIndex),
     veinFinderStat: getVeinFinderStatText(minerIndex),
@@ -1434,8 +1479,10 @@ function renderMinerPopup(): void {
     showEnchantBountiful,
     showEnricher,
     showEnrichChance,
+    showForeman,
     canBuySpeed: canAfford(speedCost),
     canBuyRadius: canAfford(radiusCost),
+    canBuyOvertime: canAfford(overtimeCost) && canUpgradeOvertime(minerIndex),
     canBuyDoubleActivationMin: canAfford(doubleActivationMinCost) && canUseClass(minerIndex, "Multi Activator"),
     canBuyDoubleActivationMax: canAfford(doubleActivationMaxCost) && canUseClass(minerIndex, "Multi Activator"),
     canBuyVeinFinder: canAfford(veinFinderCost) && canUseClass(minerIndex, "Prospector"),
@@ -1677,6 +1724,7 @@ bindUiEvents({
   render,
   buyMinerSpeedUpgrade,
   buyMinerRadiusUpgrade,
+  buyOvertimeUpgrade,
   toggleMinerRepositionMode,
   closeMinerUpgradePanel,
   closeMinerStatsPanel,

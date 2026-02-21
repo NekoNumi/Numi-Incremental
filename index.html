@@ -165,7 +165,7 @@
             </div>
             <button id="popup-upgrade-speed" class="upgrade">
               <div class="upgrade-header">
-                <span>Faster Miner</span>
+                <span id="popup-speed-label">Faster Miner</span>
                 <strong class="upgrade-quantity" id="popup-speed-level">0</strong>
               </div>
               <small id="popup-speed-stat">Current: 0.20 act/sec → Upgrading to: 0.30 act/sec</small>
@@ -173,11 +173,19 @@
             </button>
             <button id="popup-upgrade-radius" class="upgrade">
               <div class="upgrade-header">
-                <span>Wider Mining Radius</span>
+                <span id="popup-radius-label">Wider Mining Radius</span>
                 <strong class="upgrade-quantity" id="popup-radius-level">0</strong>
               </div>
               <small id="popup-radius-stat">Current: 90px radius → Upgrading to: 113px radius</small>
               <span class="upgrade-cost-row">Cost: <span id="popup-radius-cost">0</span></span>
+            </button>
+            <button id="popup-upgrade-overtime" class="upgrade">
+              <div class="upgrade-header">
+                <span>Overtime</span>
+                <strong class="upgrade-quantity" id="popup-overtime-level">0</strong>
+              </div>
+              <small id="popup-overtime-stat">Current aura bonus: +0% → Upgrading to: +3%</small>
+              <span class="upgrade-cost-row">Cost: <span id="popup-overtime-cost">0</span></span>
             </button>
             <button id="popup-upgrade-double-activation-min" class="upgrade">
               <div class="upgrade-header">
@@ -335,6 +343,10 @@
           <button id="class-pick-chain-lightning" class="upgrade">
             <div class="upgrade-header"><span>Chain Lightning</span></div>
             <small>10% proc with adjacent chain scaling</small>
+          </button>
+          <button id="class-pick-foreman" class="upgrade">
+            <div class="upgrade-header"><span>🛠 Foreman</span></div>
+            <small>Support aura for nearby workers with Motivation, Autonomy, and Overtime</small>
           </button>
           <button id="class-pick-double-activation" class="upgrade">
             <div class="upgrade-header"><span>⏩ Multi Activator</span></div>

@@ -5,6 +5,7 @@ interface MinerPopupUi {
   minerPopupTitle: HTMLElement | null;
   popupSpeedLevel: HTMLElement | null;
   popupRadiusLevel: HTMLElement | null;
+  popupOvertimeLevel: HTMLElement | null;
   popupDoubleActivationMinLevel: HTMLElement | null;
   popupDoubleActivationMaxLevel: HTMLElement | null;
   popupVeinFinderLevel: HTMLElement | null;
@@ -21,6 +22,7 @@ interface MinerPopupUi {
   popupEnrichChanceLevel: HTMLElement | null;
   popupSpeedCost: HTMLElement | null;
   popupRadiusCost: HTMLElement | null;
+  popupOvertimeCost: HTMLElement | null;
   popupDoubleActivationMinCost: HTMLElement | null;
   popupDoubleActivationMaxCost: HTMLElement | null;
   popupVeinFinderCost: HTMLElement | null;
@@ -37,6 +39,7 @@ interface MinerPopupUi {
   popupEnrichChanceCost: HTMLElement | null;
   popupSpeedStat: HTMLElement | null;
   popupRadiusStat: HTMLElement | null;
+  popupOvertimeStat: HTMLElement | null;
   popupDoubleActivationMinStat: HTMLElement | null;
   popupDoubleActivationMaxStat: HTMLElement | null;
   popupVeinFinderStat: HTMLElement | null;
@@ -73,6 +76,7 @@ interface MinerPopupUi {
   popupUpgradeEnrichChance: HTMLButtonElement | null;
   popupUpgradeSpeed: HTMLButtonElement | null;
   popupUpgradeRadius: HTMLButtonElement | null;
+  popupUpgradeOvertime: HTMLButtonElement | null;
   popupReposition: HTMLButtonElement | null;
 }
 
@@ -81,6 +85,7 @@ interface MinerPopupViewModel {
   title: string;
   speedLevel: number;
   radiusLevel: number;
+  overtimeLevel: number;
   doubleActivationMinLevel: number;
   doubleActivationMaxLevel: number;
   veinFinderLevel: number;
@@ -97,6 +102,7 @@ interface MinerPopupViewModel {
   enrichChanceLevel: number;
   speedCost: number;
   radiusCost: number;
+  overtimeCost: number;
   doubleActivationMinCost: number;
   doubleActivationMaxCost: number;
   veinFinderCost: number;
@@ -113,6 +119,7 @@ interface MinerPopupViewModel {
   enrichChanceCost: number;
   speedStat: string;
   radiusStat: string;
+  overtimeStat: string;
   doubleActivationMinStat: string;
   doubleActivationMaxStat: string;
   veinFinderStat: string;
@@ -143,8 +150,10 @@ interface MinerPopupViewModel {
   showEnchantBountiful: boolean;
   showEnricher: boolean;
   showEnrichChance: boolean;
+  showForeman: boolean;
   canBuySpeed: boolean;
   canBuyRadius: boolean;
+  canBuyOvertime: boolean;
   canBuyDoubleActivationMin: boolean;
   canBuyDoubleActivationMax: boolean;
   canBuyVeinFinder: boolean;
@@ -200,6 +209,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.minerPopupTitle) ui.minerPopupTitle.textContent = view.title;
   if (ui.popupSpeedLevel) ui.popupSpeedLevel.textContent = view.speedLevel.toString();
   if (ui.popupRadiusLevel) ui.popupRadiusLevel.textContent = view.radiusLevel.toString();
+  if (ui.popupOvertimeLevel) ui.popupOvertimeLevel.textContent = view.overtimeLevel.toString();
   if (ui.popupDoubleActivationMinLevel) ui.popupDoubleActivationMinLevel.textContent = view.doubleActivationMinLevel.toString();
   if (ui.popupDoubleActivationMaxLevel) ui.popupDoubleActivationMaxLevel.textContent = view.doubleActivationMaxLevel.toString();
   if (ui.popupVeinFinderLevel) ui.popupVeinFinderLevel.textContent = view.veinFinderLevel.toString();
@@ -216,6 +226,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupEnrichChanceLevel) ui.popupEnrichChanceLevel.textContent = view.enrichChanceLevel.toString();
   if (ui.popupSpeedCost) ui.popupSpeedCost.textContent = view.speedCost.toLocaleString();
   if (ui.popupRadiusCost) ui.popupRadiusCost.textContent = view.radiusCost.toLocaleString();
+  if (ui.popupOvertimeCost) ui.popupOvertimeCost.textContent = view.overtimeCost.toLocaleString();
   if (ui.popupDoubleActivationMinCost) ui.popupDoubleActivationMinCost.textContent = view.doubleActivationMinCost.toLocaleString();
   if (ui.popupDoubleActivationMaxCost) ui.popupDoubleActivationMaxCost.textContent = view.doubleActivationMaxCost.toLocaleString();
   if (ui.popupVeinFinderCost) ui.popupVeinFinderCost.textContent = view.veinFinderCost.toLocaleString();
@@ -232,6 +243,7 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupEnrichChanceCost) ui.popupEnrichChanceCost.textContent = view.enrichChanceCost.toLocaleString();
   if (ui.popupSpeedStat) ui.popupSpeedStat.textContent = view.speedStat;
   if (ui.popupRadiusStat) ui.popupRadiusStat.textContent = view.radiusStat;
+  if (ui.popupOvertimeStat) ui.popupOvertimeStat.textContent = view.overtimeStat;
   if (ui.popupDoubleActivationMinStat) ui.popupDoubleActivationMinStat.textContent = view.doubleActivationMinStat;
   if (ui.popupDoubleActivationMaxStat) ui.popupDoubleActivationMaxStat.textContent = view.doubleActivationMaxStat;
   if (ui.popupVeinFinderStat) ui.popupVeinFinderStat.textContent = view.veinFinderStat;
@@ -281,9 +293,11 @@ export function renderMinerPopupView(ui: MinerPopupUi, view: MinerPopupViewModel
   if (ui.popupUpgradeEnrichMin) ui.popupUpgradeEnrichMin.classList.toggle("hidden", !view.showEnricher);
   if (ui.popupUpgradeEnrichMax) ui.popupUpgradeEnrichMax.classList.toggle("hidden", !view.showEnricher);
   if (ui.popupUpgradeEnrichChance) ui.popupUpgradeEnrichChance.classList.toggle("hidden", !view.showEnrichChance);
+  if (ui.popupUpgradeOvertime) ui.popupUpgradeOvertime.classList.toggle("hidden", !view.showForeman);
 
   if (ui.popupUpgradeSpeed) ui.popupUpgradeSpeed.disabled = !view.canBuySpeed;
   if (ui.popupUpgradeRadius) ui.popupUpgradeRadius.disabled = !view.canBuyRadius;
+  if (ui.popupUpgradeOvertime) ui.popupUpgradeOvertime.disabled = !view.canBuyOvertime;
   if (ui.popupUpgradeDoubleActivationMin) ui.popupUpgradeDoubleActivationMin.disabled = !view.canBuyDoubleActivationMin;
   if (ui.popupUpgradeDoubleActivationMax) ui.popupUpgradeDoubleActivationMax.disabled = !view.canBuyDoubleActivationMax;
   if (ui.popupUpgradeVeinFinder) ui.popupUpgradeVeinFinder.disabled = !view.canBuyVeinFinder;

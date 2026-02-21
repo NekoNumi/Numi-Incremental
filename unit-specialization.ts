@@ -14,6 +14,8 @@ export function getDefaultSpecializationData(specialization: UnitSpecialization)
       };
     case "Prospector":
       return { type: specialization, veinFinderLevel: 0 };
+    case "Foreman":
+      return { type: specialization, overtimeLevel: 0 };
     case "Multi Activator":
       return { type: specialization, multiActivationMinLevel: 0, multiActivationMaxLevel: 0 };
     case "Arcanist":
@@ -33,6 +35,8 @@ export function normalizeSpecialization(value: unknown): UnitSpecialization {
       return "Crit Build";
     case "Chain Lightning":
       return "Chain Lightning";
+    case "Foreman":
+      return "Foreman";
     case "Multi Activator":
       return "Multi Activator";
     case "Arcanist":
@@ -64,6 +68,11 @@ export function buildSpecializationData(raw: Record<string, unknown>, specializa
       return {
         type: "Prospector",
         veinFinderLevel: Number(raw.veinFinderLevel) || 0,
+      };
+    case "Foreman":
+      return {
+        type: "Foreman",
+        overtimeLevel: Number(raw.overtimeLevel) || 0,
       };
     case "Multi Activator":
       return {
@@ -98,6 +107,8 @@ export function getSpecializationLabel(value: UnitSpecialization): string {
       return "🎯 Crit Build";
     case "Chain Lightning":
       return "Chain Lightning";
+    case "Foreman":
+      return "🛠 Foreman";
     case "Multi Activator":
       return "⏩ Multi Activator";
     case "Arcanist":

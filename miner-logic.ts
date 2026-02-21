@@ -30,6 +30,7 @@ interface CreateMinerLogicArgs {
   minerRadiusBonusPerLevel: number;
   fasterMinerUpgrade: UpgradeConfig;
   minerRadiusUpgrade: UpgradeConfig;
+  overtimeUpgrade: UpgradeConfig;
   doubleActivationMinUpgrade: UpgradeConfig;
   doubleActivationMaxUpgrade: UpgradeConfig;
   veinFinderUpgrade: UpgradeConfig;
@@ -52,6 +53,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getMinerCooldownSeconds: (minerIndex: number) => number;
   getMinerSpeedUpgradeCost: (minerIndex: number) => number;
   getMinerRadiusUpgradeCost: (minerIndex: number) => number;
+  getOvertimeCost: (minerIndex: number) => number;
+  canUpgradeOvertime: (minerIndex: number) => boolean;
   getMinerEffectRadiusPx: (minerIndex: number) => number;
   getDoubleActivationMinCost: (minerIndex: number) => number;
   getDoubleActivationMaxCost: (minerIndex: number) => number;
@@ -78,6 +81,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getActivationCountFromRoll: (roll: number) => number;
   getMinerSpeedStatText: (minerIndex: number) => string;
   getMinerRadiusStatText: (minerIndex: number) => string;
+  getOvertimeStatText: (minerIndex: number) => string;
   getDoubleActivationMinStatText: (minerIndex: number) => string;
   getDoubleActivationMaxStatText: (minerIndex: number) => string;
   getVeinFinderQualityMultiplier: (minerIndex: number) => number;
@@ -105,6 +109,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   getEnrichMinStatText: (minerIndex: number) => string;
   getEnrichMaxStatText: (minerIndex: number) => string;
   getEnrichChanceStatText: (minerIndex: number) => string;
+  getForemanOvertimeMultiplier: (minerIndex: number) => number;
   getMinerDisplayName: (minerIndex: number) => string;
   getMinerRingLabel: (minerIndex: number) => string;
   canOfferClassUnlock: (minerIndex: number) => boolean;
@@ -133,6 +138,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     minerRadiusBonusPerLevel,
     fasterMinerUpgrade,
     minerRadiusUpgrade,
+    overtimeUpgrade,
     doubleActivationMinUpgrade,
     doubleActivationMaxUpgrade,
     veinFinderUpgrade,
@@ -176,9 +182,111 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     };
   }
 
+  function getMinerPositionRaw(minerIndex: number): Position {
+    const position = state.idleMinerPositions[minerIndex];
+    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+      return position;
+    }
+    return getDefaultMinerPosition(minerIndex, state.idleMinerOwned, getMapSize());
+  }
+
+  function getForemanOvertimeMultiplier(minerIndex: number): number {
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Foreman" ? data.overtimeLevel : 0;
+    return 1 + Math.min(0.33, level * 0.03);
+  }
+
+  function canUpgradeOvertime(minerIndex: number): boolean {
+    if (!canUseClass(minerIndex, "Foreman")) {
+      return false;
+    }
+    return getForemanOvertimeMultiplier(minerIndex) < 1.33;
+  }
+
+  function getForemanAuraForMiner(minerIndex: number): {
+    speedMultiplier: number;
+    rangeMultiplier: number;
+    abilityChanceMultiplier: number;
+  } {
+    const recipient = getMinerUpgrade(minerIndex);
+    if (recipient.specialization === "Foreman") {
+      return {
+        speedMultiplier: 1,
+        rangeMultiplier: 1,
+        abilityChanceMultiplier: 1,
+      };
+    }
+
+    const recipientPosition = getMinerPositionRaw(minerIndex);
+    let strongestAura:
+      | {
+          strength: number;
+          speedMultiplier: number;
+          rangeMultiplier: number;
+          abilityChanceMultiplier: number;
+        }
+      | null = null;
+
+    for (let sourceIndex = 0; sourceIndex < state.idleMinerOwned; sourceIndex += 1) {
+      if (sourceIndex === minerIndex) {
+        continue;
+      }
+
+      const sourceUpgrade = getMinerUpgrade(sourceIndex);
+      if (sourceUpgrade.specialization !== "Foreman") {
+        continue;
+      }
+
+      const sourcePosition = getMinerPositionRaw(sourceIndex);
+      const deltaX = recipientPosition.x - sourcePosition.x;
+      const deltaY = recipientPosition.y - sourcePosition.y;
+      const distance = Math.hypot(deltaX, deltaY);
+      const auraRange = getMinerEffectRadiusPx(sourceIndex);
+
+      if (distance > auraRange) {
+        continue;
+      }
+
+      const sourceData = sourceUpgrade.specializationData;
+      const overtimeMultiplier = getForemanOvertimeMultiplier(sourceIndex);
+      const motivationMultiplier = 1 + sourceUpgrade.speedLevel * 0.02;
+      const autonomyMultiplier = 1 + sourceUpgrade.radiusLevel * 0.02;
+      const strength =
+        overtimeMultiplier + motivationMultiplier + autonomyMultiplier + (sourceData.type === "Foreman" ? sourceData.overtimeLevel : 0) * 0.0001;
+
+      if (!strongestAura || strength > strongestAura.strength) {
+        strongestAura = {
+          strength,
+          speedMultiplier: motivationMultiplier,
+          rangeMultiplier: autonomyMultiplier,
+          abilityChanceMultiplier: overtimeMultiplier,
+        };
+      }
+    }
+
+    if (!strongestAura) {
+      return {
+        speedMultiplier: 1,
+        rangeMultiplier: 1,
+        abilityChanceMultiplier: 1,
+      };
+    }
+
+    return {
+      speedMultiplier: strongestAura.speedMultiplier,
+      rangeMultiplier: strongestAura.rangeMultiplier,
+      abilityChanceMultiplier: strongestAura.abilityChanceMultiplier,
+    };
+  }
+
   function getMinerClicksPerSecond(minerIndex: number): number {
     const upgrade = getMinerUpgrade(minerIndex);
-    return 1 / idleMinerTriggerIntervalSeconds + upgrade.speedLevel * fasterMinerBonusClicksPerSecond;
+    const foremanRecipient = upgrade.specialization === "Foreman";
+    const baseClicksPerSecond = foremanRecipient
+      ? 1 / idleMinerTriggerIntervalSeconds
+      : 1 / idleMinerTriggerIntervalSeconds + upgrade.speedLevel * fasterMinerBonusClicksPerSecond;
+    const aura = getForemanAuraForMiner(minerIndex);
+    return baseClicksPerSecond * aura.speedMultiplier;
   }
 
   function getMinerCooldownSeconds(minerIndex: number): number {
@@ -199,9 +307,17 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     return getUpgradeCost(minerRadiusUpgrade, upgrade.radiusLevel);
   }
 
+  function getOvertimeCost(minerIndex: number): number {
+    const unit = getMinerUpgrade(minerIndex);
+    const level = unit.specializationData.type === "Foreman" ? unit.specializationData.overtimeLevel : 0;
+    return getUpgradeCost(overtimeUpgrade, level);
+  }
+
   function getMinerEffectRadiusPx(minerIndex: number): number {
     const upgrade = getMinerUpgrade(minerIndex);
-    return baseMinerEffectRadiusPx * (1 + upgrade.radiusLevel * minerRadiusBonusPerLevel);
+    const baseRadius = baseMinerEffectRadiusPx * (1 + upgrade.radiusLevel * minerRadiusBonusPerLevel);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return baseRadius * aura.rangeMultiplier;
   }
 
   function getDoubleActivationMinCost(minerIndex: number): number {
@@ -238,7 +354,9 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     if (!canUseClass(minerIndex, "Crit Build")) {
       return false;
     }
-    return getCritChance(minerIndex) < 0.75;
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
+    return Math.min(0.75, 0.1 + level * 0.03) < 0.75;
   }
 
   function getChainReactionCost(minerIndex: number): number {
@@ -263,14 +381,18 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     if (!canUseClass(minerIndex, "Chain Lightning")) {
       return false;
     }
-    return getChainMetalBiasChance(minerIndex) < 0.75;
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Chain Lightning" ? data.metalBiasLevel : 0;
+    return Math.min(0.75, level * 0.05) < 0.75;
   }
 
   function canUpgradeElectricEfficiency(minerIndex: number): boolean {
     if (!canUseClass(minerIndex, "Chain Lightning")) {
       return false;
     }
-    return getElectricEfficiencyChance(minerIndex) < 0.5;
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Chain Lightning" ? data.electricEfficiencyLevel : 0;
+    return Math.min(0.5, level * 0.05) < 0.5;
   }
 
   function getEnchantBountifulCost(minerIndex: number): number {
@@ -283,7 +405,9 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     if (!canUseClass(minerIndex, "Arcanist")) {
       return false;
     }
-    return getEnchantBountifulChance(minerIndex) < 0.75;
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Arcanist" ? data.enchantBountifulLevel : 0;
+    return Math.min(0.75, 0.15 + level * 0.1) < 0.75;
   }
 
   function getEnchantBountifulMinCost(minerIndex: number): number {
@@ -320,7 +444,9 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     if (!canUseClass(minerIndex, "Enricher")) {
       return false;
     }
-    return getEnrichChance(minerIndex) < 0.75;
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Enricher" ? data.enrichChanceLevel : 0;
+    return Math.min(0.75, 0.2 + level * 0.08) < 0.75;
   }
 
   function canUseClass(minerIndex: number, spec: UnitSpecialization): boolean {
@@ -374,6 +500,11 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function getMinerSpeedStatText(minerIndex: number): string {
     const upgrade = getMinerUpgrade(minerIndex);
+    if (upgrade.specialization === "Foreman") {
+      const current = (upgrade.speedLevel * 2).toFixed(0);
+      const next = ((upgrade.speedLevel + 1) * 2).toFixed(0);
+      return `Current Motivation: +${current}% worker speed → Upgrading to: +${next}%`;
+    }
     const current = (1 / idleMinerTriggerIntervalSeconds + upgrade.speedLevel * fasterMinerBonusClicksPerSecond).toFixed(2);
     const next = (1 / idleMinerTriggerIntervalSeconds + (upgrade.speedLevel + 1) * fasterMinerBonusClicksPerSecond).toFixed(2);
     return `Current: ${current} act/sec → Upgrading to: ${next} act/sec`;
@@ -381,9 +512,26 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
 
   function getMinerRadiusStatText(minerIndex: number): string {
     const upgrade = getMinerUpgrade(minerIndex);
+    if (upgrade.specialization === "Foreman") {
+      const current = (upgrade.radiusLevel * 2).toFixed(0);
+      const next = ((upgrade.radiusLevel + 1) * 2).toFixed(0);
+      return `Current Autonomy: +${current}% worker range → Upgrading to: +${next}%`;
+    }
     const currentRadius = Math.round(getMinerEffectRadiusPx(minerIndex));
     const nextRadius = Math.round(baseMinerEffectRadiusPx * (1 + (upgrade.radiusLevel + 1) * minerRadiusBonusPerLevel));
     return `Current: ${currentRadius}px radius → Upgrading to: ${nextRadius}px radius`;
+  }
+
+  function getOvertimeStatText(minerIndex: number): string {
+    const current = ((getForemanOvertimeMultiplier(minerIndex) - 1) * 100).toFixed(0);
+    if (!canUpgradeOvertime(minerIndex)) {
+      return `Current aura bonus: +${current}% (Max reached)`;
+    }
+
+    const data = getMinerUpgrade(minerIndex).specializationData;
+    const level = data.type === "Foreman" ? data.overtimeLevel : 0;
+    const next = (Math.min(0.33, (level + 1) * 0.03) * 100).toFixed(0);
+    return `Current aura bonus: +${current}% → Upgrading to: +${next}%`;
   }
 
   function getDoubleActivationMinStatText(minerIndex: number): string {
@@ -421,7 +569,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Crit Build" ? data.critChanceLevel : 0;
-    return Math.min(0.75, 0.1 + level * 0.03);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return Math.min(1, Math.min(0.75, 0.1 + level * 0.03) * aura.abilityChanceMultiplier);
   }
 
   function getCritMultiplier(minerIndex: number): number {
@@ -436,7 +585,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Chain Lightning" ? data.chainReactionChanceLevel : 0;
-    return Math.min(0.5, 0.1 + level * 0.02);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return Math.min(1, Math.min(0.5, 0.1 + level * 0.02) * aura.abilityChanceMultiplier);
   }
 
   function getChainReactionLength(minerIndex: number): number {
@@ -454,7 +604,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Chain Lightning" ? data.metalBiasLevel : 0;
-    return Math.min(0.75, level * 0.05);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return Math.min(1, Math.min(0.75, level * 0.05) * aura.abilityChanceMultiplier);
   }
 
   function getElectricEfficiencyChance(minerIndex: number): number {
@@ -463,7 +614,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Chain Lightning" ? data.electricEfficiencyLevel : 0;
-    return Math.min(0.5, level * 0.05);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return Math.min(1, Math.min(0.5, level * 0.05) * aura.abilityChanceMultiplier);
   }
 
   function getEnchantBountifulChance(minerIndex: number): number {
@@ -472,7 +624,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Arcanist" ? data.enchantBountifulLevel : 0;
-    return Math.min(0.75, 0.15 + level * 0.1);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return Math.min(1, Math.min(0.75, 0.15 + level * 0.1) * aura.abilityChanceMultiplier);
   }
 
   function getEnchantBountifulMinMultiplier(minerIndex: number): number {
@@ -517,7 +670,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     }
     const data = getMinerUpgrade(minerIndex).specializationData;
     const level = data.type === "Enricher" ? data.enrichChanceLevel : 0;
-    return Math.min(0.75, 0.2 + level * 0.08);
+    const aura = getForemanAuraForMiner(minerIndex);
+    return Math.min(1, Math.min(0.75, 0.2 + level * 0.08) * aura.abilityChanceMultiplier);
   }
 
   function getCritChanceStatText(minerIndex: number): string {
@@ -628,6 +782,9 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     if (upgrade.specialization === "Chain Lightning") {
       return `⚡${minerIndex + 1}`;
     }
+    if (upgrade.specialization === "Foreman") {
+      return `🛠${minerIndex + 1}`;
+    }
     if (upgrade.specialization === "Multi Activator") {
       return `⏩${minerIndex + 1}`;
     }
@@ -714,11 +871,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
   }
 
   function getMinerPosition(minerIndex: number): Position {
-    const position = state.idleMinerPositions[minerIndex];
-    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
-      return position;
-    }
-    return getDefaultMinerPosition(minerIndex, state.idleMinerOwned, getMapSize());
+    return getMinerPositionRaw(minerIndex);
   }
 
   function getEligibleTilesForMiner(minerIndex: number, availableTiles: HTMLElement[], mapSize: number): HTMLElement[] {
@@ -743,6 +896,8 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getMinerCooldownSeconds,
     getMinerSpeedUpgradeCost,
     getMinerRadiusUpgradeCost,
+    getOvertimeCost,
+    canUpgradeOvertime,
     getMinerEffectRadiusPx,
     getDoubleActivationMinCost,
     getDoubleActivationMaxCost,
@@ -769,6 +924,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getActivationCountFromRoll,
     getMinerSpeedStatText,
     getMinerRadiusStatText,
+    getOvertimeStatText,
     getDoubleActivationMinStatText,
     getDoubleActivationMaxStatText,
     getVeinFinderQualityMultiplier,
@@ -796,6 +952,7 @@ export function createMinerLogic(args: CreateMinerLogicArgs): {
     getEnrichMinStatText,
     getEnrichMaxStatText,
     getEnrichChanceStatText,
+    getForemanOvertimeMultiplier,
     getMinerDisplayName,
     getMinerRingLabel,
     canOfferClassUnlock,

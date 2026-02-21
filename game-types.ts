@@ -3,7 +3,7 @@ export type OreType = "sand" | "coal" | "copper" | "iron" | "silver" | "gold" | 
 export type UpgradableOre = Exclude<OreType, "sand">;
 export type TileEnchantment = "none" | "bountiful" | "enriched";
 
-export type UnitSpecialization = "Worker" | "Crit Build" | "Chain Lightning" | "Prospector" | "Multi Activator" | "Arcanist" | "Enricher";
+export type UnitSpecialization = "Worker" | "Crit Build" | "Chain Lightning" | "Prospector" | "Multi Activator" | "Arcanist" | "Enricher" | "Foreman";
 export type MinerTargeting = "random" | "high-quality" | "low-quality";
 
 export interface Unit {
@@ -25,6 +25,7 @@ export type UnitSpecializationData =
       metalBiasLevel: number;
       electricEfficiencyLevel: number;
     }
+  | { type: "Foreman"; overtimeLevel: number }
   | { type: "Prospector"; veinFinderLevel: number }
   | { type: "Multi Activator"; multiActivationMinLevel: number; multiActivationMaxLevel: number }
   | { type: "Arcanist"; enchantBountifulLevel: number; enchantBountifulMinLevel: number; enchantBountifulMaxLevel: number }
